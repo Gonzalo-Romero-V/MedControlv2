@@ -105,9 +105,13 @@ La GUI debe soportar usuarios con dificultades visuales, auditivas y cognitivas:
 - Errores de DB: críticos — loguear + mostrar mensaje claro. No silenciar.
 - Conectividad: detectar antes de llamar a servicios externos; mostrar estado y habilitar flujo manual.
 
+## Multi-paciente
+
+El modelo de datos se diseña desde el inicio para soportar N pacientes por dispositivo (caso: cuidador con varios pacientes). El MVP puede exponer solo 1 paciente activo en la UI, pero el schema SQLite incluye `patient_id` en todas las tablas relevantes desde el día 1. Escalar la UI para multi-paciente es una extensión, no un refactor.
+
 ## Decisiones pendientes
 
 - [ ] State management: Riverpod vs BLoC vs Provider
-- [ ] Soporte multi-paciente en un dispositivo: ¿perfil activo o perfiles simultáneos?
 - [ ] TalkBack / VoiceOver: ¿MVP o fase 2?
 - [ ] Estrategia de backup local: export a archivo vs sync cloud futuro
+- [ ] UI multi-paciente: ¿selector de perfil activo o tabs simultáneos?

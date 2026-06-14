@@ -27,7 +27,10 @@ status: locked
 
 > Entidades de dominio, sus estados, sus reglas, sus relaciones.
 
-_(agregar al crear notas H2 — una por entidad o concepto cohesivo)_
+- [[medicamento]] — entidad principal: nombre, dosis, frecuencia, vía, instrucciones, duración _(pendiente de crear)_
+- [[base-de-conocimiento]] — hechos, reglas de inferencia, motor de razonamiento explícito _(pendiente de crear)_
+- [[paciente]] — perfil de usuario, accesibilidad, relación con cuidador _(pendiente de crear)_
+- [[recordatorio]] — horario confirmado, historial de tomas, estados _(pendiente de crear)_
 
 ---
 
@@ -56,10 +59,14 @@ _(documentos crudos en `raw/` — PDFs, transcripts, imágenes — ingeridos con
 
 | Tarea | Notas obligatorias |
 |-------|---------------------|
-| _(completar según el dominio del proyecto)_ | |
-| Ejemplo: nueva entidad de dominio | `domain/<entidad>.md` + `decisions/architecture.md` |
-| Ejemplo: nueva ruta / endpoint | `domain/<entidad>.md` + `decisions/api-contracts.md` (si existe) |
-| Ejemplo: cambio de modelo / schema | `domain/<entidad>.md` + `domain/data-model.md` (si existe) |
+| Agregar o modificar un medicamento | `domain/medicamento.md` + `decisions/architecture.md` |
+| Cambiar reglas de inferencia | `domain/base-de-conocimiento.md` + `decisions/architecture.md` |
+| Modificar flujo de registro de receta (OCR/IA) | `domain/medicamento.md` + `decisions/stack.md` |
+| Agregar/modificar recordatorios | `domain/recordatorio.md` + `decisions/architecture.md` |
+| Cambiar modelo de datos / schema SQLite | `domain/medicamento.md` + `domain/paciente.md` + `domain/recordatorio.md` |
+| Feature de accesibilidad / GUI | `domain/paciente.md` + `intent/vision.md` |
+| Cambio de proveedor IA u OCR | `decisions/stack.md` + `domain/base-de-conocimiento.md` |
+| Feature de cuidador / multi-paciente | `domain/paciente.md` + `decisions/architecture.md` |
 
 ---
 

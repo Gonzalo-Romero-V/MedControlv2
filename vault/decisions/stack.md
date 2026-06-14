@@ -13,8 +13,10 @@ created: 2026-06-14
 - **Persistencia local**: SQLite vía `sqflite` o `drift`
 - **Notificaciones**: `flutter_local_notifications` — programadas localmente, sin servidor
 - **Cámara / captura**: `image_picker` + `camera`
-- **OCR**: <!-- TODO: decidir → Google ML Kit on-device (sin internet, sin costo) vs Google Cloud Vision API (mejor precisión, requiere internet) -->
-- **IA / parser semántico**: <!-- TODO: decidir → Claude API / Gemini / GPT-4 Vision para interpretar recetas en texto → entidades estructuradas. Requiere internet solo en este paso. -->
+- **OCR (vía principal)**: Google Cloud Vision API — `DOCUMENT_TEXT_DETECTION`. Requiere internet. Mejor precisión en recetas impresas y difíciles.
+- **OCR (vía fallback)**: Google ML Kit Text Recognition — on-device, sin internet, sin costo. Menor precisión.
+- **IA / parser semántico (vía principal)**: Gemini (free tier) o equivalente con respuesta JSON estructurada. Requiere internet. Interpreta texto OCR → entidades (medicamento, dosis, frecuencia, instrucciones).
+- **Parser fallback offline**: formulario manual simple prellenado con el texto OCR extraído por ML Kit. No se implementa parser basado en reglas en MVP — demasiada complejidad para el gain obtenido. Decisión revisable post-MVP según avance.
 - **Backend**: Opcional, fuera del MVP. No requerido para funcionamiento core.
 - **Locale**: Español (Colombia / regional), formato DD/MM/YYYY
 
@@ -48,7 +50,7 @@ Arquitectura local-first porque el usuario (adulto mayor con posible conectivida
 
 ## Decisiones pendientes
 
-- [ ] OCR: on-device (ML Kit, sin internet) vs cloud (mejor precisión, requiere conexión en registro)
-- [ ] AI provider: Claude API, Gemini, GPT-4 Vision — afecta costo, privacidad y latencia
 - [ ] Versión mínima Android/iOS objetivo
-- [ ] Gestión de múltiples pacientes en un mismo dispositivo (cuidador que maneja N pacientes)
+- [ ] Gemini vs otra API: confirmar modelo específico y si el free tier es suficiente para el volumen esperado
+- [ ] State management Flutter: Riverpod vs BLoC vs Provider
+- [ ] Parser fallback offline post-MVP: ¿reglas simples o mantener formulario manual?
