@@ -109,9 +109,17 @@ La GUI debe soportar usuarios con dificultades visuales, auditivas y cognitivas:
 
 El modelo de datos se diseña desde el inicio para soportar N pacientes por dispositivo (caso: cuidador con varios pacientes). El MVP puede exponer solo 1 paciente activo en la UI, pero el schema SQLite incluye `patient_id` en todas las tablas relevantes desde el día 1. Escalar la UI para multi-paciente es una extensión, no un refactor.
 
+## Riverpod — convenciones de uso
+
+- **`Provider`**: dependencias estáticas (repositorios, servicios, config)
+- **`FutureProvider`**: datos async de una sola carga (ej: lista de tratamientos activos)
+- **`StateNotifierProvider`**: estado mutable con lógica (ej: flujo de registro de receta, estado de confirmación)
+- **`StreamProvider`**: recordatorios en tiempo real si aplica
+- Los providers de repositorios e infraestructura van en `lib/providers/`; los de UI en el feature correspondiente
+- Nunca leer repositorios directamente desde widgets — siempre a través de un provider
+
 ## Decisiones pendientes
 
-- [ ] State management: Riverpod vs BLoC vs Provider
 - [ ] TalkBack / VoiceOver: ¿MVP o fase 2?
 - [ ] Estrategia de backup local: export a archivo vs sync cloud futuro
 - [ ] UI multi-paciente: ¿selector de perfil activo o tabs simultáneos?

@@ -39,18 +39,52 @@ Arquitectura local-first porque el usuario (adulto mayor con posible conectivida
 - **0 dependencias de red en runtime de recordatorios**: `flutter_local_notifications` programa alarmas nativas; no hay llamada a servidor para disparar una notificación.
 - **SQLite como única fuente de verdad local**: los hechos de la base de conocimiento y el historial de tomas se persisten en SQLite.
 
+## State management
+
+**Riverpod** (flutter_riverpod). Elegido por menor boilerplate que BLoC, integración natural con Clean Architecture (providers exponiendo repositorios y use cases), y mejor DX para MVPs donde la velocidad importa. Patrón: `Provider` / `FutureProvider` / `StateNotifierProvider` según el caso.
+
+## Versiones objetivo
+
+- **Android mínimo**: 8.0 (API 26) — cubre 95%+ de dispositivos activos, garantiza soporte completo de `flutter_local_notifications`, permisos y cámara
+- **iOS mínimo**: 13.0 (por definir al momento de setup Xcode)
+
+## AI provider — diseño modular
+
+El proveedor de IA es **parametrizado por variables de entorno**, nunca hardcodeado. Interfaz abstracta `AiParserService` en la capa Domain; implementaciones concretas intercambiables en Data.
+
+```
+Domain:
+  abstract class AiParserService {
+    Future<ParsedPrescription> parse(String ocrText);
+  }
+
+Data/implementations:
+  GeminiParserService   implements AiParserService   ← activo por defecto
+  OpenAiParserService   implements AiParserService   ← disponible
+  // otros a futuro
+
+Configuración (.env):
+  AI_PROVIDER=gemini          # gemini | openai
+  AI_API_KEY=<key>
+  AI_MODEL=gemini-1.5-flash   # modelo específico, override opcional
+```
+
+El `AiParserService` activo se inyecta vía Riverpod provider leyendo `AI_PROVIDER` del env al arranque. Cambiar de proveedor = cambiar variable de entorno, sin tocar código.
+
+**Proveedor inicial**: Gemini (free tier, modelo `gemini-1.5-flash`). La API key la provee el usuario vía `.env` cuando se necesite — no hay mock, el flujo manual actúa como fallback natural si no hay key configurada.
+
 ## Herramientas de desarrollo
 
-<!-- TODO: completar conforme se definan -->
 - Lenguaje: Dart
-- Versión Flutter: por definir (estable actual al momento de inicio)
+- Versión Flutter: estable actual al momento de inicio
+- State management: flutter_riverpod
 - Tests: flutter_test + integration_test
-- Lint: `flutter_lints`
+- Lint: flutter_lints
+- Variables de entorno: `flutter_dotenv`
 - CI: por definir
 
 ## Decisiones pendientes
 
-- [ ] Versión mínima Android/iOS objetivo
-- [ ] Gemini vs otra API: confirmar modelo específico y si el free tier es suficiente para el volumen esperado
-- [ ] State management Flutter: Riverpod vs BLoC vs Provider
-- [ ] Parser fallback offline post-MVP: ¿reglas simples o mantener formulario manual?
+- [ ] iOS mínimo: confirmar al momento de setup Xcode
+- [ ] Gemini model: `gemini-1.5-flash` (velocidad) vs `gemini-1.5-pro` (precisión) — evaluar con recetas reales
+- [ ] Parser fallback offline post-MVP: formulario manual es suficiente para MVP
