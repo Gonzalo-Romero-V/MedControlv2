@@ -27,10 +27,10 @@ status: locked
 
 > Entidades de dominio, sus estados, sus reglas, sus relaciones.
 
-- [[medicamento]] — entidad principal: nombre, dosis, frecuencia, vía, instrucciones, duración _(pendiente de crear)_
-- [[base-de-conocimiento]] — hechos, reglas de inferencia, motor de razonamiento explícito _(pendiente de crear)_
-- [[paciente]] — perfil de usuario, accesibilidad, relación con cuidador _(pendiente de crear)_
-- [[recordatorio]] — horario confirmado, historial de tomas, estados _(pendiente de crear)_
+- [[medicamento]] — entidad Medicamento + Tratamiento: estados, tipos de fin, conflictos por duplicado
+- [[base-de-conocimiento]] — hechos, reglas R01–R13, motor de inferencia forward-chaining, explicabilidad
+- [[paciente]] — perfiles autónomo/asistido, accesibilidad, modelo multi-paciente, horas de comida/sueño
+- [[recordatorio]] — Recordatorio + Toma: ventana dinámica intervalo/2, ventana fija para críticos, adherencia
 
 ---
 

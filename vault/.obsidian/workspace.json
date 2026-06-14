@@ -11,10 +11,14 @@
             "id": "22a5d4442eccc411",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Vista gráfica"
+              "type": "markdown",
+              "state": {
+                "file": "domain/base-de-conocimiento.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "base-de-conocimiento"
             }
           }
         ]
@@ -178,6 +182,14 @@
   },
   "active": "22a5d4442eccc411",
   "lastOpenFiles": [
+    "domain/base-de-conocimiento.md",
+    "domain/base-de-conocimiento.md.tmp.9632.1e5d1da5df0e",
+    "domain/paciente.md",
+    "domain/paciente.md.tmp.9632.de2c1445ef49",
+    "domain/recordatorio.md",
+    "domain/recordatorio.md.tmp.9632.b39f218f57f1",
+    "domain/medicamento.md",
+    "domain/medicamento.md.tmp.9632.485d0ce6cbc1",
     "decisions/architecture.md.tmp.9632.ad487a9a5c31",
     "decisions/stack.md.tmp.9632.01b828c038e0",
     "decisions/stack.md.tmp.9632.b4ca89576f0d",
