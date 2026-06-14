@@ -10,7 +10,7 @@ void main() {
   const engine = InferenceEngine();
   const profile = PatientProfile.defaults;
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
+  // ─── Helper ────────────────────────────────────────────────────────────────
 
   TreatmentFacts baseFacts({
     FrequencyType type = FrequencyType.everyNHours,
@@ -48,6 +48,19 @@ void main() {
       expect(result.appliedRules, contains('R07'));
     });
 
+    test('traza R07 tiene condición y conclusión correctas', () {
+      final facts = TreatmentFacts(
+        medicationName: 'Med',
+        startDate: DateTime(2026, 1, 1),
+      );
+      final result = engine.inferSchedule(facts, profile);
+
+      expect(result.traces, hasLength(1));
+      expect(result.traces.first.ruleId, equals('R07'));
+      expect(result.traces.first.condition, contains('campo crítico'));
+      expect(result.traces.first.conclusion, contains('no inferir'));
+    });
+
     test('retorna missingFields cuando falta frequencyValue para everyNHours', () {
       final facts = TreatmentFacts(
         medicationName: 'Med',
@@ -56,10 +69,10 @@ void main() {
         frequencyType: FrequencyType.everyNHours,
         startDate: DateTime(2026, 1, 1),
       );
-      final result = engine.inferSchedule(facts, profile);
-
-      expect(result.hasMissingFields, isTrue);
-      expect(result.missingFields, contains('intervalo de horas'));
+      expect(
+        engine.inferSchedule(facts, profile).missingFields,
+        contains('intervalo de horas'),
+      );
     });
 
     test('retorna missingFields cuando falta frequencyValue para nTimesDay', () {
@@ -70,10 +83,10 @@ void main() {
         frequencyType: FrequencyType.nTimesDay,
         startDate: DateTime(2026, 1, 1),
       );
-      final result = engine.inferSchedule(facts, profile);
-
-      expect(result.hasMissingFields, isTrue);
-      expect(result.missingFields, contains('veces por día'));
+      expect(
+        engine.inferSchedule(facts, profile).missingFields,
+        contains('veces por día'),
+      );
     });
   });
 
@@ -81,13 +94,25 @@ void main() {
 
   group('R06 — a demanda', () {
     test('retorna isOnDemand sin horarios', () {
-      final facts = baseFacts(type: FrequencyType.onDemand, value: null);
-      final result = engine.inferSchedule(facts, profile);
+      final result = engine.inferSchedule(
+        baseFacts(type: FrequencyType.onDemand, value: null),
+        profile,
+      );
 
       expect(result.isOnDemand, isTrue);
       expect(result.suggestions, isEmpty);
       expect(result.canCreateReminders, isFalse);
       expect(result.appliedRules, contains('R06'));
+    });
+
+    test('traza R06 tiene condición correcta', () {
+      final result = engine.inferSchedule(
+        baseFacts(type: FrequencyType.onDemand, value: null),
+        profile,
+      );
+
+      expect(result.traces.first.ruleId, equals('R06'));
+      expect(result.traces.first.condition, contains('a_demanda'));
     });
   });
 
@@ -128,6 +153,15 @@ void main() {
       expect(result.suggestions, hasLength(1));
       expect(result.suggestions[0].time, equals(const MedTime(8, 0)));
     });
+
+    test('traza R01 contiene condición y conclusión correctas', () {
+      final result = engine.inferSchedule(baseFacts(value: 8), profile);
+      final trace = result.traces.firstWhere((t) => t.ruleId == 'R01');
+
+      expect(trace.condition, contains('cada_8h'));
+      expect(trace.conclusion, contains('3 tomas'));
+      expect(trace.explanation, isNotEmpty);
+    });
   });
 
   // ─── R02: N veces al día ───────────────────────────────────────────────────
@@ -151,7 +185,6 @@ void main() {
       );
 
       expect(result.suggestions, hasLength(2));
-      // 07:00 + (15h/2)*0 = 07:00, 07:00 + (15h/2)*1 = 14:30
       expect(result.suggestions[0].time, equals(const MedTime(7, 0)));
       expect(result.suggestions[1].time, equals(const MedTime(14, 30)));
     });
@@ -180,7 +213,6 @@ void main() {
       );
 
       expect(result.appliedRules, contains('R03'));
-      // 3 comidas por defecto: 07:00, 13:00, 19:00
       final times = result.suggestions.map((s) => s.time).toList();
       expect(times, contains(const MedTime(7, 0)));
       expect(times, contains(const MedTime(13, 0)));
@@ -197,7 +229,6 @@ void main() {
         profile,
       );
 
-      expect(result.appliedRules, contains('R03'));
       expect(result.suggestions, hasLength(1));
       expect(result.suggestions[0].time, equals(const MedTime(7, 0)));
     });
@@ -212,10 +243,25 @@ void main() {
         profile,
       );
 
-      expect(result.appliedRules, contains('R03'));
       expect(result.suggestions, hasLength(2));
       expect(result.suggestions[0].time, equals(const MedTime(7, 0)));
       expect(result.suggestions[1].time, equals(const MedTime(19, 0)));
+    });
+
+    test('traza R03 tiene condición y conclusión correctas', () {
+      final result = engine.inferSchedule(
+        baseFacts(
+          type: FrequencyType.nTimesDay,
+          value: 3,
+          instructions: 'con comida',
+        ),
+        profile,
+      );
+
+      final trace = result.traces.firstWhere((t) => t.ruleId == 'R03');
+      expect(trace.condition, contains('"con comida"'));
+      expect(trace.conclusion, contains('perfil'));
+      expect(trace.explanation, isNotEmpty);
     });
   });
 
@@ -234,7 +280,6 @@ void main() {
 
       expect(result.appliedRules, contains('R04'));
       expect(result.suggestions, hasLength(1));
-      // PatientProfile.defaults.sleepTime = 21:00
       expect(result.suggestions[0].time, equals(const MedTime(21, 0)));
     });
 
@@ -286,16 +331,15 @@ void main() {
 
       expect(result.appliedRules, contains('R05'));
       expect(result.suggestions, hasLength(1));
-      // 07:00 - 30min = 06:30
       expect(result.suggestions[0].time, equals(const MedTime(6, 30)));
     });
 
-    test('R03 tiene precedencia sobre R05 (no pueden coexistir)', () {
+    test('R03 tiene precedencia sobre R05', () {
       final result = engine.inferSchedule(
         baseFacts(
           type: FrequencyType.nTimesDay,
           value: 1,
-          instructions: 'con comida en ayunas', // R03 va primero
+          instructions: 'con comida en ayunas',
         ),
         profile,
       );
@@ -305,37 +349,42 @@ void main() {
     });
   });
 
-  // ─── R08: política de posposición estándar ────────────────────────────────
+  // ─── R08: snooze estándar ─────────────────────────────────────────────────
 
   group('R08 — snooze estándar', () {
     test('cada 8h → ventana 4h, 3 posposiciones', () {
       final result = engine.inferSchedule(baseFacts(value: 8), profile);
 
-      expect(result.snoozePolicy, isNotNull);
       expect(result.snoozePolicy!.isCritical, isFalse);
       expect(result.snoozePolicy!.window, equals(const Duration(hours: 4)));
       expect(result.snoozePolicy!.maxSnoozes, equals(3));
       expect(result.snoozePolicy!.ruleId, equals('R08'));
     });
 
-    test('cada 12h → ventana 6h, 3 posposiciones', () {
-      final result = engine.inferSchedule(baseFacts(value: 12), profile);
-
-      expect(result.snoozePolicy!.window, equals(const Duration(hours: 6)));
-      expect(result.snoozePolicy!.maxSnoozes, equals(3));
+    test('cada 12h → ventana 6h', () {
+      expect(
+        engine.inferSchedule(baseFacts(value: 12), profile).snoozePolicy!.window,
+        equals(const Duration(hours: 6)),
+      );
     });
 
     test('snoozeInterval = window / maxSnoozes', () {
-      final result = engine.inferSchedule(baseFacts(value: 6), profile);
-      final policy = result.snoozePolicy!;
+      final policy = engine.inferSchedule(baseFacts(value: 6), profile).snoozePolicy!;
 
-      // 6h intervalo → 3h ventana; 3h / 3 posposiciones = 1h cada una
       expect(policy.window, equals(const Duration(hours: 3)));
       expect(policy.snoozeInterval, equals(const Duration(hours: 1)));
     });
+
+    test('traza R08 aparece en traces', () {
+      final traces = engine.inferSchedule(baseFacts(value: 8), profile).traces;
+      final trace = traces.firstWhere((t) => t.ruleId == 'R08');
+
+      expect(trace.condition, contains('es_critico = false'));
+      expect(trace.conclusion, contains('3 posposiciones'));
+    });
   });
 
-  // ─── R09: política de posposición crítica ────────────────────────────────
+  // ─── R09: snooze crítico ──────────────────────────────────────────────────
 
   group('R09 — snooze crítico', () {
     test('isCritical=true → ventana 30min, 0 posposiciones', () {
@@ -344,7 +393,6 @@ void main() {
         profile,
       );
 
-      expect(result.snoozePolicy, isNotNull);
       expect(result.snoozePolicy!.isCritical, isTrue);
       expect(result.snoozePolicy!.window, equals(const Duration(minutes: 30)));
       expect(result.snoozePolicy!.maxSnoozes, equals(0));
@@ -352,18 +400,90 @@ void main() {
     });
 
     test('snoozeInterval es cero para medicamentos críticos', () {
+      expect(
+        engine.inferSchedule(baseFacts(isCritical: true), profile)
+            .snoozePolicy!.snoozeInterval,
+        equals(Duration.zero),
+      );
+    });
+
+    test('traza R09 aparece en traces', () {
+      final traces = engine
+          .inferSchedule(baseFacts(isCritical: true), profile)
+          .traces;
+      final trace = traces.firstWhere((t) => t.ruleId == 'R09');
+
+      expect(trace.condition, contains('es_critico = true'));
+      expect(trace.conclusion, contains('sin posposición'));
+    });
+  });
+
+  // ─── R10: conflictos ──────────────────────────────────────────────────────
+
+  group('R10 — conflictos de principio activo', () {
+    test('sin conflictos → hasConflicts false', () {
+      final result = engine.inferSchedule(baseFacts(value: 8), profile);
+
+      expect(result.hasConflicts, isFalse);
+      expect(result.conflicts, isEmpty);
+    });
+
+    test('un medicamento conflictivo → ConflictAlert con R10', () {
       final result = engine.inferSchedule(
-        baseFacts(isCritical: true),
+        baseFacts(value: 8),
         profile,
+        conflictingMedications: ['Ibuprofeno 400mg'],
       );
 
-      expect(result.snoozePolicy!.snoozeInterval, equals(Duration.zero));
+      expect(result.hasConflicts, isTrue);
+      expect(result.conflicts, hasLength(1));
+      expect(result.conflicts.first.ruleId, equals('R10'));
+      expect(result.conflicts.first.conflictingMedicationName,
+          equals('Ibuprofeno 400mg'));
+      expect(result.conflicts.first.explanation, isNotEmpty);
+    });
+
+    test('múltiples conflictos → un ConflictAlert por cada uno', () {
+      final result = engine.inferSchedule(
+        baseFacts(value: 8),
+        profile,
+        conflictingMedications: ['MedA', 'MedB'],
+      );
+
+      expect(result.conflicts, hasLength(2));
+      expect(
+        result.conflicts.map((c) => c.conflictingMedicationName),
+        containsAll(['MedA', 'MedB']),
+      );
+    });
+
+    test('conflictos no afectan las sugerencias de horario', () {
+      final withoutConflict = engine.inferSchedule(baseFacts(value: 8), profile);
+      final withConflict = engine.inferSchedule(
+        baseFacts(value: 8),
+        profile,
+        conflictingMedications: ['OtroMed'],
+      );
+
+      expect(withConflict.suggestions.length,
+          equals(withoutConflict.suggestions.length));
+    });
+
+    test('R10 no aparece en appliedRules (es alerta, no regla de scheduling)', () {
+      final result = engine.inferSchedule(
+        baseFacts(value: 8),
+        profile,
+        conflictingMedications: ['OtroMed'],
+      );
+
+      // R10 NO está en traces (conflicts es campo separado)
+      expect(result.appliedRules, isNot(contains('R10')));
     });
   });
 
   // ─── Trazabilidad ─────────────────────────────────────────────────────────
 
-  group('Trazabilidad — explicaciones', () {
+  group('Trazabilidad — InferenceTrace', () {
     test('cada SuggestedTime tiene ruleIds y explanation no vacíos', () {
       final result = engine.inferSchedule(baseFacts(value: 8), profile);
 
@@ -373,7 +493,27 @@ void main() {
       }
     });
 
-    test('R01 + R03 juntos aparecen en ruleIds', () {
+    test('traces no está vacío para un resultado normal', () {
+      final result = engine.inferSchedule(baseFacts(value: 8), profile);
+
+      expect(result.traces, isNotEmpty);
+    });
+
+    test('appliedRules es derivado de traces (sin duplicados)', () {
+      final result = engine.inferSchedule(
+        baseFacts(
+          type: FrequencyType.nTimesDay,
+          value: 3,
+          instructions: 'con comida',
+        ),
+        profile,
+      );
+
+      final fromTraces = result.traces.map((t) => t.ruleId).toSet().toList();
+      expect(result.appliedRules.toSet(), equals(fromTraces.toSet()));
+    });
+
+    test('R01 + R03 coexisten en ruleIds de cada SuggestedTime', () {
       final result = engine.inferSchedule(
         baseFacts(
           type: FrequencyType.nTimesDay,
@@ -386,35 +526,42 @@ void main() {
       expect(result.suggestions.first.ruleIds, containsAll(['R02', 'R03']));
     });
 
+    test('cada InferenceTrace tiene condition, conclusion y explanation', () {
+      final result = engine.inferSchedule(baseFacts(value: 8), profile);
+
+      for (final trace in result.traces) {
+        expect(trace.ruleId, isNotEmpty);
+        expect(trace.condition, isNotEmpty);
+        expect(trace.conclusion, isNotEmpty);
+        expect(trace.explanation, isNotEmpty);
+      }
+    });
+
     test('canCreateReminders es false cuando hay missingFields', () {
       final facts = TreatmentFacts(
         medicationName: 'Med',
         startDate: DateTime(2026, 1, 1),
       );
-      final result = engine.inferSchedule(facts, profile);
-
-      expect(result.canCreateReminders, isFalse);
+      expect(engine.inferSchedule(facts, profile).canCreateReminders, isFalse);
     });
 
     test('canCreateReminders es true con todos los campos presentes', () {
-      final result = engine.inferSchedule(baseFacts(value: 8), profile);
-
-      expect(result.canCreateReminders, isTrue);
+      expect(
+        engine.inferSchedule(baseFacts(value: 8), profile).canCreateReminders,
+        isTrue,
+      );
     });
   });
 
   // ─── MedTime helpers ──────────────────────────────────────────────────────
 
   group('MedTime', () {
-    test('fromMinutes envuelve correctamente pasada medianoche', () {
-      final t = MedTime.fromMinutes(25 * 60); // 25h → 01:00
-      expect(t, equals(const MedTime(1, 0)));
+    test('fromMinutes envuelve pasada medianoche', () {
+      expect(MedTime.fromMinutes(25 * 60), equals(const MedTime(1, 0)));
     });
 
     test('addMinutes cruza medianoche correctamente', () {
-      const t = MedTime(23, 30);
-      final t2 = t.addMinutes(60); // 00:30
-      expect(t2, equals(const MedTime(0, 30)));
+      expect(const MedTime(23, 30).addMinutes(60), equals(const MedTime(0, 30)));
     });
 
     test('format produce string con padding', () {

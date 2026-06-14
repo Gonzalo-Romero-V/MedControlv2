@@ -4,6 +4,7 @@ type: domain
 layer: H2
 created: 2026-06-14
 related: [[medicamento]], [[recordatorio]], [[base-de-conocimiento]]
+code_path: app/lib/domain/entities/patient_profile.dart
 ---
 
 # Paciente & Cuidador
@@ -103,3 +104,19 @@ TalkBack / VoiceOver: contemplado en el diseño (semántica de widgets Flutter) 
 - [ ] PIN para alternar entre modo asistido y modo configuración — ¿MVP o fase 2?
 - [ ] ¿El cuidador tiene su propio perfil en el dispositivo o solo accede por configuración?
 - [ ] Notificaciones: si hay múltiples pacientes, ¿cómo se distinguen en la notificación?
+
+## Implementación (Fase 2)
+Subconjunto del perfil relevante para el motor de inferencia implementado en `app/lib/domain/entities/patient_profile.dart`:
+
+```dart
+class PatientProfile {
+  final MedTime breakfastTime;  // hora_desayuno (default 07:00)
+  final MedTime lunchTime;      // hora_almuerzo (default 13:00)
+  final MedTime dinnerTime;     // hora_cena     (default 19:00)
+  final MedTime sleepTime;      // hora_dormir   (default 21:00)
+  static const PatientProfile defaults = ...;
+  List<MedTime> get mealTimes => [breakfastTime, lunchTime, dinnerTime];
+}
+```
+
+La entidad completa (accesibilidad, `tipo_perfil`, etc.) está en `app/lib/infrastructure/database/tables/patients_table.dart`. La conversión entre tabla y `PatientProfile` queda en el use case de la Fase 5.

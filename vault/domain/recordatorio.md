@@ -4,6 +4,7 @@ type: domain
 layer: H2
 created: 2026-06-14
 related: [[medicamento]], [[base-de-conocimiento]]
+code_path: app/lib/domain/entities/inference_result.dart
 ---
 
 # Recordatorio & Toma

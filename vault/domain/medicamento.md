@@ -4,6 +4,7 @@ type: domain
 layer: H2
 created: 2026-06-14
 related: [[recordatorio]], [[base-de-conocimiento]], [[paciente]]
+code_path: app/lib/domain/entities/treatment_facts.dart
 ---
 
 # Medicamento & Tratamiento

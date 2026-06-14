@@ -2,14 +2,48 @@ import 'package:equatable/equatable.dart';
 
 import 'med_time.dart';
 
-/// Un horario sugerido con la traza completa de las reglas que lo generaron.
+/// Traza completa de una regla aplicada: condición → conclusión + explicación humana.
+class InferenceTrace extends Equatable {
+  final String ruleId;
+  final String condition;    // qué disparó la regla
+  final String conclusion;   // qué produjo
+  final String explanation;  // texto en español para mostrar al usuario
+
+  const InferenceTrace({
+    required this.ruleId,
+    required this.condition,
+    required this.conclusion,
+    required this.explanation,
+  });
+
+  @override
+  List<Object?> get props => [ruleId, condition, conclusion, explanation];
+}
+
+/// Alerta de conflicto generada por R10 — tratamiento activo del mismo principio activo.
+class ConflictAlert extends Equatable {
+  final String ruleId;  // siempre 'R10'
+  final String conflictingMedicationName;
+  final String explanation;
+
+  const ConflictAlert({
+    required this.ruleId,
+    required this.conflictingMedicationName,
+    required this.explanation,
+  });
+
+  @override
+  List<Object?> get props => [ruleId, conflictingMedicationName, explanation];
+}
+
+/// Un horario sugerido con referencias a las reglas de scheduling que lo generaron.
 class SuggestedTime extends Equatable {
   final MedTime time;
 
-  /// IDs de reglas canónicas que produjeron este horario (ej: ['R01', 'R03'])
+  /// IDs de reglas de scheduling que produjeron este horario (subconjunto de InferenceResult.traces)
   final List<String> ruleIds;
 
-  /// Explicación en español para mostrar al usuario
+  /// Explicación en español derivada de las trazas aplicables
   final String explanation;
 
   const SuggestedTime({
@@ -22,7 +56,7 @@ class SuggestedTime extends Equatable {
   List<Object?> get props => [time, ruleIds, explanation];
 }
 
-/// Información sobre la ventana de posposición calculada para este tratamiento
+/// Información sobre la ventana de posposición calculada para este tratamiento.
 class SnoozePolicy extends Equatable {
   final Duration window;
   final int maxSnoozes;
@@ -47,40 +81,73 @@ class SnoozePolicy extends Equatable {
 }
 
 /// Resultado completo del motor de inferencia.
+///
+/// Incluye horarios sugeridos, trazas completas de cada regla aplicada,
+/// alertas de conflicto (R10) y política de posposición (R08/R09).
 class InferenceResult extends Equatable {
   final List<SuggestedTime> suggestions;
-  final List<String> appliedRules;
+
+  /// Trazas de todas las reglas que se evaluaron y dispararon.
+  final List<InferenceTrace> traces;
+
   final List<String> missingFields;
+
+  /// Alertas de conflicto con tratamientos activos — generadas por R10.
+  /// El use case decide si bloquear o pedir confirmación explícita.
+  final List<ConflictAlert> conflicts;
+
   final SnoozePolicy? snoozePolicy;
   final bool isOnDemand;
 
   const InferenceResult({
     required this.suggestions,
-    required this.appliedRules,
+    required this.traces,
     this.missingFields = const [],
+    this.conflicts = const [],
     this.snoozePolicy,
     this.isOnDemand = false,
   });
 
+  /// IDs de todas las reglas aplicadas — derivado de traces.
+  List<String> get appliedRules =>
+      traces.map((t) => t.ruleId).toSet().toList();
+
   bool get hasMissingFields => missingFields.isNotEmpty;
+  bool get hasConflicts => conflicts.isNotEmpty;
   bool get canCreateReminders => !hasMissingFields && !isOnDemand;
 
-  /// Sin horarios porque faltan campos críticos
   factory InferenceResult.missingFields(List<String> fields) =>
       InferenceResult(
         suggestions: const [],
-        appliedRules: const ['R07'],
+        traces: const [
+          InferenceTrace(
+            ruleId: 'R07',
+            condition: 'falta campo crítico',
+            conclusion: 'no inferir horarios',
+            explanation:
+                'No se pueden calcular horarios porque faltan datos '
+                'obligatorios de la receta.',
+          ),
+        ],
         missingFields: fields,
       );
 
-  /// Sin horarios porque es medicamento a demanda
   factory InferenceResult.onDemand() => const InferenceResult(
         suggestions: [],
-        appliedRules: ['R06'],
+        traces: [
+          InferenceTrace(
+            ruleId: 'R06',
+            condition: 'frecuencia = a_demanda',
+            conclusion: 'sin horarios programados',
+            explanation:
+                'Este medicamento se toma cuando el paciente lo necesita. '
+                'No genera recordatorios automáticos.',
+          ),
+        ],
         isOnDemand: true,
       );
 
   @override
   List<Object?> get props =>
-      [suggestions, appliedRules, missingFields, snoozePolicy, isOnDemand];
+      [suggestions, traces, missingFields, conflicts, snoozePolicy, isOnDemand];
 }

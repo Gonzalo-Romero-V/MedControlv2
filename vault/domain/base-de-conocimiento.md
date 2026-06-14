@@ -4,6 +4,7 @@ type: domain
 layer: H2
 created: 2026-06-14
 related: [[medicamento]], [[recordatorio]], [[paciente]]
+code_path: app/lib/domain/services/inference_engine.dart
 ---
 
 # Base de Conocimiento
@@ -163,3 +164,32 @@ Esta descripción es correcta técnicamente y suficiente para defender que el si
 - Reglas de contraindicación por condición del paciente (ej: insuficiencia renal → ajuste de dosis)
 - Aprendizaje de preferencias horarias: si el usuario ajusta consistentemente los horarios sugeridos, el sistema puede proponer horarios personalizados
 - Reglas para pautas de reducción (tapering): múltiples fases con lógica compleja
+
+## Implementación (Fase 2)
+Motor implementado en `app/lib/domain/services/inference_engine.dart` — clase pura Dart, 0 dependencias de Flutter.
+
+Entidades auxiliares en `app/lib/domain/entities/`:
+- `MedTime` — tiempo del día como minutos desde medianoche
+- `TreatmentFacts` — hechos del tratamiento, entrada al motor (`FrequencyType` enum)
+- `PatientProfile` — horas de comida y sueño del paciente, entrada al motor
+- `InferenceTrace` — traza de una regla: `ruleId`, `condition`, `conclusion`, `explanation`
+- `ConflictAlert` — alerta R10: `ruleId='R10'`, `conflictingMedicationName`, `explanation`
+- `SnoozePolicy` — política de posposición: ventana, maxSnoozes, isCritical, ruleId
+- `InferenceResult` — resultado completo: `suggestions`, `traces`, `missingFields`, `conflicts`, `snoozePolicy`
+
+Contrato real de `inferSchedule`:
+```dart
+InferenceResult inferSchedule(
+  TreatmentFacts facts,
+  PatientProfile profile, {
+  List<String> conflictingMedications = const [],
+});
+```
+
+El parámetro `conflictingMedications` lo provee el use case consultando el repositorio. R10 se evalúa en el motor y produce `ConflictAlert` en el resultado — el use case decide si bloquear o pedir confirmación explícita.
+
+`InferenceResult.appliedRules` es un getter derivado de `traces.map(t => t.ruleId)` — no es campo independiente.
+
+Reglas R01–R10 implementadas. R11–R13 (lifecycle) son responsabilidad de use cases.
+
+Coverage: 45 tests unitarios en `app/test/domain/inference_engine_test.dart`.
