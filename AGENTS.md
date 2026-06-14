@@ -1,9 +1,9 @@
-# __PROJECT_NAME__ — Guía para agentes de IA
+# MedControlv2 — Guía para agentes de IA
 
 > Esta guía es **canónica** y la lee cualquier CLI de IA que abra el repo
 > (Claude Code, Codex CLI, Cursor, etc.). `CLAUDE.md` la importa con `@AGENTS.md`.
 >
-> Stack activo: **`__STACK__`** (extractor configurado en `vault_sync.config.json`).
+> Stack activo: **`generic`** (extractor configurado en `vault_sync.config.json`).
 
 ---
 
@@ -16,7 +16,7 @@ El código (H4–H5) refleja al vault (H1–H3), nunca al revés.
 Toda sesión nueva, antes de la primera respuesta no-trivial, debe:
 
 1. **Leer este archivo completo** — ya estás acá, sigamos.
-2. **Leer el `INDEX.md` del vault** (`__VAULT_ABSOLUTE_PATH__/INDEX.md`). Nota: el vault NO está dentro del repo; vive en una carpeta separada (path absoluto, no relativo).
+2. **Leer el `INDEX.md` del vault** (`C:/Users/Gonzalo/Dev/MATERIAS/02_BC/MedControlv2/vault/INDEX.md`). Nota: el vault NO está dentro del repo; vive en una carpeta separada (path absoluto, no relativo).
 3. **Identificar la tarea** y consultar la tabla de abajo para saber qué notas leer.
 4. **Leer SOLO esas notas** — no leer el vault completo, no inventar.
 5. **Recién entonces** explorar código del repo.
@@ -135,13 +135,13 @@ Más detalle en `USAGE.md` (cara dev) y `vault/SYSTEM.md` (cara agente).
 
 ### Vault y código
 
-- **Vault**: `__VAULT_ABSOLUTE_PATH__`
+- **Vault**: `C:/Users/Gonzalo/Dev/MATERIAS/02_BC/MedControlv2/vault`
 - **Sistema vault-sync**: `vault/SYSTEM.md` (locked, leer una vez por sesión)
 - **Manual de uso humano**: `USAGE.md`
 - **Engine determinista**: `scripts/vault_sync.py` (stdlib only, 0 deps externas)
 - **Estado en vivo**: `.vault-sync/facts.json` — snapshot semántico, actualizado
   por el post-commit hook. **No leer el código si la respuesta ya está acá.**
-- **Extractor activo**: `__STACK__`. Los campos que produce en `facts.json`
+- **Extractor activo**: `generic`. Los campos que produce en `facts.json`
   varían según el extractor; ver `scripts/lib/extractors/<extractor>.py` para
   el contrato exacto.
 
@@ -166,7 +166,7 @@ que toque más de un archivo debería respetar esas convenciones.
 
 ## Adaptación al proyecto
 
-Este `AGENTS.md` se generó al bootstrappear con `--stack __STACK__` el `__DATE__`.
+Este `AGENTS.md` se generó al bootstrappear con `--stack generic` el `2026-06-14`.
 **Antes de empezar a operar el sistema en serio**, hacé esto una vez:
 
 1. **Completar la tabla "Qué notas leer según la tarea"** con filas
