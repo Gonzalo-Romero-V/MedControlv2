@@ -21,3 +21,7 @@ Thumbs.db
 
 # Graphify (cuando se usa con --with-graphify, su salida queda fuera de git)
 graphify-out/
+
+# Secrets de la app Flutter (no commitear)
+app/.env
+app/medcontrolv2-*.json
