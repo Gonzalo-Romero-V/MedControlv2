@@ -80,9 +80,9 @@
     "hooks/post-commit",
     "CHANGELOG.md"
   ],
-  "env_scan_scope": [
-    "app/lib/**"
-  ],
+  "env_scan_scope": {
+    "app": ["lib/**"]
+  },
   "vault_protected_status": [
     "locked"
   ],
