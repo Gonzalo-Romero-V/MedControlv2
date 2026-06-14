@@ -28,39 +28,36 @@
       ".gitattributes"
     ],
     "H4_contracts": [
-      "src/**/models/**",
-      "src/**/types/**",
-      "src/**/schemas/**",
-      "src/**/entities/**",
-      "internal/**/types/**",
-      "internal/**/models/**",
-      "app/**/models/**",
-      "app/**/schemas/**",
-      "**/*.proto",
-      "migrations/**",
+      "app/lib/domain/entities/**",
+      "app/lib/domain/repositories/**",
+      "app/lib/domain/services/**",
+      "app/lib/domain/use_cases/**",
+      "app/lib/infrastructure/database/**",
       "db/migrations/**"
     ],
     "H5_implementation": [
-      "src/**/services/**",
-      "src/**/controllers/**",
-      "src/**/handlers/**",
-      "src/**/components/**",
-      "internal/**/handlers/**",
-      "cmd/**",
-      "app/**/services/**",
-      "app/**/api/**"
+      "app/lib/data/**",
+      "app/lib/presentation/**",
+      "app/lib/core/**",
+      "app/lib/main.dart"
     ],
     "ENV_references": [
-      ".env",
-      ".env.example",
-      ".env.local",
-      ".env.production"
+      "app/.env",
+      "app/.env.example"
     ]
   },
   "exclude_patterns": [
     "vault/INDEX.md",
     "vault/SYSTEM.md",
     "vault/.obsidian/**",
+    "app/.dart_tool/**",
+    "app/.flutter-plugins",
+    "app/.flutter-plugins-dependencies",
+    "app/build/**",
+    "app/android/.gradle/**",
+    "app/android/app/build/**",
+    "app/ios/Pods/**",
+    "app/pubspec.lock",
     "**/node_modules/**",
     "**/vendor/**",
     "**/__pycache__/**",
@@ -84,12 +81,7 @@
     "CHANGELOG.md"
   ],
   "env_scan_scope": [
-    "src/**",
-    "app/**",
-    "internal/**",
-    "cmd/**",
-    "lib/**",
-    "pkg/**"
+    "app/lib/**"
   ],
   "vault_protected_status": [
     "locked"
