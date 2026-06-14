@@ -58,6 +58,9 @@
     ]
   },
   "exclude_patterns": [
+    "vault/INDEX.md",
+    "vault/SYSTEM.md",
+    "vault/.obsidian/**",
     "**/node_modules/**",
     "**/vendor/**",
     "**/__pycache__/**",

@@ -3,6 +3,7 @@ status: draft
 type: intent
 layer: H1
 created: 2026-06-14
+related: [[paciente]], [[medicamento]], [[recordatorio]], [[base-de-conocimiento]]
 ---
 
 # Visión — MedControlv2
