@@ -25,6 +25,7 @@ dependencies:
   # Local notifications
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
+  flutter_timezone: ^5.1.0
 
   # Camera & image
   image_picker: ^1.1.2

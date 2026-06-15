@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -13,8 +14,13 @@ class NotificationService {
 
   Future<void> initialize() async {
     tz.initializeTimeZones();
-    // MVP: hardcoded to Argentina; Phase 6 can detect device timezone
-    tz.setLocalLocation(tz.getLocation('America/Argentina/Buenos_Aires'));
+    try {
+      final tzInfo = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
+    } catch (_) {
+      // Fallback: primary deployment region; only reached if platform channel fails
+      tz.setLocalLocation(tz.getLocation('America/Argentina/Buenos_Aires'));
+    }
 
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings(

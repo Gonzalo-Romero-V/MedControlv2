@@ -54,7 +54,7 @@ duración/cantidad, tratamiento indefinido.
 ## Requisitos
 
 - Flutter SDK ≥ 3.33 (`flutter --version`)
-- Android SDK 21+ o iOS 14+ para correr en dispositivo o emulador
+- Android SDK 26+ (Android 8.0) o iOS 13+ para correr en dispositivo o emulador
 - Python 3.8+ para el engine del vault (opcional — solo para `/sync`)
 
 ---
