@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/today_reminders/today_reminders_screen.dart';
+import 'screens/prescription/prescription_flow_screen.dart';
 
 class MedControlApp extends ConsumerWidget {
   const MedControlApp({super.key});
@@ -18,7 +19,27 @@ class MedControlApp extends ConsumerWidget {
           fontSizeFactor: 1.1,
         ),
       ),
-      home: const TodayRemindersScreen(),
+      home: const _HomeScreen(),
+    );
+  }
+}
+
+class _HomeScreen extends StatelessWidget {
+  const _HomeScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: const TodayRemindersScreen(),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const PrescriptionFlowScreen(),
+          ),
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('Registrar receta'),
+      ),
     );
   }
 }

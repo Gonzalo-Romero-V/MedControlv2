@@ -70,6 +70,53 @@ class ParsedPrescription extends Equatable {
         startDate: startDate,
       );
 
+  factory ParsedPrescription.empty({String rawOcrText = ''}) =>
+      ParsedPrescription(
+        rawOcrText: rawOcrText,
+        source: PrescriptionSource.mlkitManual,
+      );
+
+  ParsedPrescription copyWith({
+    String? medicationName,
+    String? activeIngredient,
+    double? doseAmount,
+    String? doseUnit,
+    FrequencyType? frequencyType,
+    int? frequencyValue,
+    String? route,
+    String? specialInstructions,
+    String? endCriterionType,
+    int? durationDays,
+    int? totalDoses,
+    bool? isCritical,
+    String? rawOcrText,
+    String? rawAiResponse,
+    PrescriptionSource? source,
+    bool clearDoseAmount = false,
+    bool clearFrequencyValue = false,
+    bool clearDurationDays = false,
+    bool clearTotalDoses = false,
+  }) =>
+      ParsedPrescription(
+        medicationName: medicationName ?? this.medicationName,
+        activeIngredient: activeIngredient ?? this.activeIngredient,
+        doseAmount: clearDoseAmount ? null : (doseAmount ?? this.doseAmount),
+        doseUnit: doseUnit ?? this.doseUnit,
+        frequencyType: frequencyType ?? this.frequencyType,
+        frequencyValue:
+            clearFrequencyValue ? null : (frequencyValue ?? this.frequencyValue),
+        route: route ?? this.route,
+        specialInstructions: specialInstructions ?? this.specialInstructions,
+        endCriterionType: endCriterionType ?? this.endCriterionType,
+        durationDays:
+            clearDurationDays ? null : (durationDays ?? this.durationDays),
+        totalDoses: clearTotalDoses ? null : (totalDoses ?? this.totalDoses),
+        isCritical: isCritical ?? this.isCritical,
+        rawOcrText: rawOcrText ?? this.rawOcrText,
+        rawAiResponse: rawAiResponse ?? this.rawAiResponse,
+        source: source ?? this.source,
+      );
+
   @override
   List<Object?> get props => [
         medicationName,
