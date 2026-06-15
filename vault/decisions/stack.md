@@ -137,3 +137,43 @@ La promesa de las secciones Fase 5 de `stack.md` y `recordatorio.md` ("Phase 6 d
 ### Decisión: modelo Gemini — resuelta en Fase 3
 
 `gemini-2.0-flash` reemplazó a `gemini-1.5-flash` (deprecado) desde `e65de7e`. El checkbox en 'Decisiones pendientes' es historial; la decisión está cerrada.
+
+## Notificaciones — arquitectura dual Fase 9 (352d507)
+### Dos canales Android
+
+| Canal | ID | Importance | Uso |
+|---|---|---|---|
+| Alerta activa | `med_control_alert` | MAX | Modo ACTIVO: `alarmClock`, `fullScreenIntent=true` |
+| Discreto | `med_control_subtle` | DEFAULT | Modo DISCRETO: `exactAllowWhileIdle`, sin sonido |
+
+### Modos de programación (AndroidScheduleMode)
+
+- **`alarmClock`** (`AlarmManagerCompat.setAlarmClock()`): sobrevive Doze mode, muestra ícono de reloj en status bar. Usado para modo ACTIVO y snoozes ACTIVOS.
+- **`exactAllowWhileIdle`**: exacto pero respetuoso de Doze. Usado para modo DISCRETO.
+- **Fallback `inexact`**: si `canScheduleExactNotifications()` retorna false (Android 12 sin grant manual).
+
+### Permisos requeridos (AndroidManifest.xml)
+
+```xml
+<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+<uses-permission android:name="android.permission.USE_EXACT_ALARM"/>               <!-- API 33+ -->
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>
+```
+
+**USE_FULL_SCREEN_INTENT en Android 14+**: restringido por Google Play a apps de llamadas/reloj. Sin grant manual del usuario, las alarmas no emergen sobre otras apps ni sobre la pantalla de bloqueo. Se solicita vía `requestFullScreenIntentPermission()` desde `ProfileSettingsScreen`.
+
+### BroadcastReceivers — registro obligatorio en Manifest
+
+`flutter_local_notifications` v18 **no auto-registra** sus receivers. Ausencia → AlarmManager dispara en silencio, broadcasts caen al vacío:
+
+```xml
+<receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" android:exported="false"/>
+<receiver android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" android:exported="false"/>
+<receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver" android:exported="false">
+  <!-- BOOT_COMPLETED + MY_PACKAGE_REPLACED + QUICKBOOT_POWERON -->
+</receiver>
+```
+
+### pendingAlarmNotifier — patrón de integración
+
+`ValueNotifier` global como bridge entre los callbacks nativos de notificaciones (que llegan fuera del árbol de widgets) y la navegación Flutter. Alternativa a `ProviderContainer` precompartido — más simple, sin dependencia de `@visibleForTesting parent:`.

@@ -220,3 +220,34 @@ app/lib/presentation/providers/historial_providers.dart
 app/lib/presentation/features/historial/historial_screen.dart
 app/lib/presentation/features/historial/treatment_detail_screen.dart
 ```
+
+## Detección de duplicados — Fase 9 (352d507)
+### Regla de negocio
+
+Un paciente no puede tener dos tratamientos **activos** o **suspendidos** para el mismo medicamento simultáneamente. El sistema detecta duplicados por nombre (case-insensitive, `.toLowerCase().trim()`) o por principio activo compartido.
+
+### Flujo de detección
+
+```
+ConfirmPrescriptionUseCase.execute(forceOverride: false)
+  ├─ MedicationDao.findDuplicate(patientId, name, activeIngredient)
+  │    └─ coincidencia case-insensitive por nombre O principio activo
+  ├─ TreatmentDao.getConflicting(medicationId)  ← estados active/suspended
+  └─ throws DuplicateMedicationException(medicationName)
+       └─ PrescriptionFlowProvider catch
+            → estado PrescriptionFlowDuplicateConflict
+                 → PrescriptionFlowScreen._showDuplicateDialog()
+                      ├─ checkbox obligatorio: el usuario confirma que asume el riesgo
+                      └─ si acepta → confirmAndSave(forceOverride: true)
+```
+
+**forceOverride=true**: reutiliza el `medicamento.id` existente (evita duplicar la tabla) pero crea un `Tratamiento` nuevo. El tratamiento anterior permanece activo hasta que el usuario lo cierre.
+
+### Code paths — Fase 9
+
+```
+app/lib/domain/use_cases/confirm_prescription_use_case.dart            ← DuplicateMedicationException
+app/lib/infrastructure/database/daos/medication_dao.dart               ← findDuplicate()
+app/lib/presentation/providers/prescription_flow_provider.dart         ← PrescriptionFlowDuplicateConflict
+app/lib/presentation/screens/prescription/prescription_flow_screen.dart ← dialog + checkbox
+```

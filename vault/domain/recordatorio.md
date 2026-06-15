@@ -192,3 +192,68 @@ app/lib/presentation/providers/reminder_providers.dart
 
 ## Timezone detection — resuelta (14ad78d)
 La sección 'Implementación Fase 5' decía: "Phase 6 detecta timezone del dispositivo". La detección real se implementó en `14ad78d` (posterior a Fase 6): `flutter_timezone ^5.1.0` → `FlutterTimezone.getLocalTimezone().identifier` → `tz.setLocalLocation()`. Fallback a `America/Argentina/Buenos_Aires` si el platform channel falla.
+
+## Modos de alerta — Fase 9 (352d507)
+### Arquitectura dual: ACTIVO vs DISCRETO
+
+El `NotificationMode` del perfil del paciente controla cómo se entrega cada recordatorio:
+
+| Modo | Canal Android | Comportamiento |
+|------|--------------|----------------|
+| `active` | `med_control_alert` | `fullScreenIntent=true`, sin botones en notificación. Lanza `AlarmScreen`. |
+| `subtle` | `med_control_subtle` | Notificación estándar con botones de acción. Handler en background. |
+
+### Modo ACTIVO — AlarmScreen
+
+`AlarmScreen` es una pantalla Flutter a pantalla completa que emerge sobre la pantalla de bloqueo y, en Android 14+ con permiso `USE_FULL_SCREEN_INTENT` concedido, sobre cualquier app en primer plano.
+
+Acciones disponibles:
+- **Tomé el medicamento** → `RecordIntakeUseCase(taken: true)` → cierra pantalla
+- **Posponer 30 min** (solo no-críticos) → `SnoozeReminderUseCase` → nueva alarma activa
+- **No puedo tomarlo** (solo críticos) → `RecordIntakeUseCase(taken: false)` → cierra pantalla
+- **Cerrar sin acción** (escape hatch) → diálogo de confirmación antes de cerrar
+
+`PopScope(canPop: false)` impide cierre accidental por back button.
+
+### Modo DISCRETO — background handler
+
+Notificación estándar con botones de acción. El handler `_onNotificationBackgroundAction` (anotado `@pragma('vm:entry-point')`) corre en isolate separado cuando la app está muerta.
+
+Botones: **Tomé ✓** / **Posponer 30 min** / **No puedo tomarlo** (críticos).
+Los dos primeros tienen `showsUserInterface: false` → no abren la app.
+
+### pendingAlarmNotifier — bridge callbacks → widget tree
+
+`ValueNotifier<NotificationResponse?>` global en `pending_alarm_notifier.dart`.
+
+Flujos que lo populan:
+1. **App muerta + alarma ACTIVO**: `main()` llama `getNotificationLaunchDetails()` → setea el notifier antes de `runApp()`.
+2. **App viva + alarma ACTIVO**: `_onNotificationForegroundAction()` lo setea al recibir el callback.
+
+`_MainShellState` escucha el notifier en `initState` y navega a `AlarmScreen` en el primer frame disponible (`addPostFrameCallback`).
+
+### Payload extendido (4 campos)
+
+Formato: `reminderId||medicationName||isCritical||isAlertMode`
+
+`isAlertMode` se propaga a través de `SnoozeReminderUseCase.execute(isAlertMode:...)` para que los recordatorios pospuestos hereden el modo del original.
+
+### USE_FULL_SCREEN_INTENT — comportamiento por versión Android
+
+| Situación | Android ≤ 13 | Android 14+ sin permiso | Android 14+ con permiso |
+|---|---|---|---|
+| Pantalla bloqueada | ✅ AlarmScreen automática | ❌ Heads-up notification | ✅ AlarmScreen automática |
+| Usando otra app | ❌ Heads-up notification | ❌ Notificación pequeña | ✅ AlarmScreen automática |
+
+`NotificationService.requestFullScreenIntentPermission()` abre la pantalla de sistema si el permiso no está concedido (no-op en Android ≤ 13). El banner en `ProfileSettingsScreen` guía al usuario cuando selecciona modo ACTIVO.
+
+### Code paths — Fase 9
+
+```
+app/lib/infrastructure/notifications/notification_service.dart     ← dual-mode, payload 4 campos
+app/lib/infrastructure/notifications/pending_alarm_notifier.dart   ← bridge global
+app/lib/presentation/features/alarm/alarm_screen.dart             ← pantalla de alarma
+app/lib/main.dart                                                   ← foreground/background handlers
+app/lib/presentation/app.dart                                       ← listener en _MainShell
+app/lib/presentation/screens/settings/profile_settings_screen.dart ← banner permiso FSI
+```
