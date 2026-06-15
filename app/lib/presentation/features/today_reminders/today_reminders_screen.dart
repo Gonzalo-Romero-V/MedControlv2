@@ -3,65 +3,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../providers/reminder_providers.dart';
-import '../../screens/prescription/prescription_flow_screen.dart';
-import '../../screens/settings/profile_settings_screen.dart';
 
-class TodayRemindersScreen extends ConsumerWidget {
-  const TodayRemindersScreen({super.key});
+/// Body content for the "Hoy" tab.
+/// The parent _MainShell provides the Scaffold, AppBar, FAB, and NavigationBar.
+class TodayRemindersContent extends ConsumerWidget {
+  const TodayRemindersContent({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final remindersAsync = ref.watch(todayRemindersProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Hoy — ${DateFormat('d MMM', 'es').format(DateTime.now())}',
-        ),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Actualizar',
-            onPressed: () => ref.invalidate(todayRemindersProvider),
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Perfil',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: (_) => const ProfileSettingsScreen()),
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => const PrescriptionFlowScreen()),
-        ),
-        icon: const Icon(Icons.add),
-        label: const Text('Registrar receta'),
-      ),
-      body: remindersAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorState(message: e.toString()),
-        data: (reminders) {
-          if (reminders.isEmpty) return const _EmptyState();
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: reminders.length,
-            separatorBuilder: (_, i) => const Divider(height: 1, indent: 16),
-            itemBuilder: (context, i) {
-              final vm = reminders[i];
-              return _ReminderTile(
-                vm: vm,
-                onAction: () => _showActionSheet(context, ref, vm),
-              );
-            },
-          );
-        },
-      ),
+    return remindersAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _ErrorState(message: e.toString()),
+      data: (reminders) {
+        if (reminders.isEmpty) return const _EmptyState();
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: reminders.length,
+          separatorBuilder: (_, i) => const Divider(height: 1, indent: 16),
+          itemBuilder: (context, i) {
+            final vm = reminders[i];
+            return _ReminderTile(
+              vm: vm,
+              onAction: () => _showActionSheet(context, ref, vm),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -70,8 +39,7 @@ class TodayRemindersScreen extends ConsumerWidget {
     WidgetRef ref,
     ReminderViewModel vm,
   ) async {
-    final reminder = vm.reminder;
-    final isDone = reminder.status == 'taken' || reminder.status == 'closed';
+    final isDone = vm.reminder.status == 'taken' || vm.reminder.status == 'closed';
     if (isDone) return;
 
     await showModalBottomSheet<void>(
