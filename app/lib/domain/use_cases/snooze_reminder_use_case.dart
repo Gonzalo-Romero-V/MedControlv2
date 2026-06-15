@@ -1,0 +1,46 @@
+import '../../infrastructure/database/app_database.dart';
+import '../../infrastructure/database/daos/reminder_dao.dart';
+import '../../infrastructure/notifications/notification_service.dart';
+
+class SnoozeReminderUseCase {
+  final ReminderDao reminderDao;
+  final NotificationService notificationService;
+
+  static const _maxSnoozes = 3;
+  static const _snoozeDuration = Duration(minutes: 30);
+
+  const SnoozeReminderUseCase({
+    required this.reminderDao,
+    required this.notificationService,
+  });
+
+  /// Returns true if snooze was applied.
+  /// Returns false when: medicamento crítico, o ya se alcanzó el máximo de postposiciones.
+  Future<bool> execute({
+    required RemindersTableData reminder,
+    required bool isCritical,
+    required String medicationName,
+  }) async {
+    if (isCritical) return false;
+    if (reminder.snoozeCount >= _maxSnoozes) return false;
+
+    final newTime = DateTime.now().add(_snoozeDuration);
+    final notifId = reminder.id.hashCode.abs() & 0x7FFFFFFF;
+
+    await notificationService.cancelReminder(notifId);
+    await notificationService.scheduleOnce(
+      id: notifId,
+      medicationName: medicationName,
+      scheduledTime: newTime,
+      body: 'Recordatorio pospuesto (${reminder.snoozeCount + 1}/$_maxSnoozes).',
+    );
+
+    await reminderDao.updateStatus(
+      reminder.id,
+      'snoozed',
+      snoozeCount: reminder.snoozeCount + 1,
+    );
+
+    return true;
+  }
+}

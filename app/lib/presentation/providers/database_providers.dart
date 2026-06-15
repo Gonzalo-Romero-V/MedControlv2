@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../infrastructure/database/app_database.dart';
+import '../../infrastructure/database/daos/intake_dao.dart';
 import '../../infrastructure/database/daos/medication_dao.dart';
 import '../../infrastructure/database/daos/patient_dao.dart';
+import '../../infrastructure/database/daos/reminder_dao.dart';
 import '../../infrastructure/database/daos/treatment_dao.dart';
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
@@ -21,4 +23,12 @@ final medicationDaoProvider = Provider<MedicationDao>(
 
 final treatmentDaoProvider = Provider<TreatmentDao>(
   (ref) => ref.watch(appDatabaseProvider).treatmentDao,
+);
+
+final reminderDaoProvider = Provider<ReminderDao>(
+  (ref) => ref.watch(appDatabaseProvider).reminderDao,
+);
+
+final intakeDaoProvider = Provider<IntakeDao>(
+  (ref) => ref.watch(appDatabaseProvider).intakeDao,
 );

@@ -25,8 +25,8 @@ class ConfirmPrescriptionUseCase {
     required this.treatmentDao,
   });
 
-  /// Retorna el ID del tratamiento creado.
-  Future<String> execute(
+  /// Retorna el ID del tratamiento y del paciente activo.
+  Future<({String treatmentId, String patientId})> execute(
     ParsedPrescription prescription, {
     DateTime? startDate,
   }) async {
@@ -38,7 +38,7 @@ class ConfirmPrescriptionUseCase {
       medicationId,
       startDate ?? DateTime.now(),
     );
-    return treatmentId;
+    return (treatmentId: treatmentId, patientId: patientId);
   }
 
   Future<String> _ensureActivePatient() async {

@@ -1,15 +1,19 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/inference_result.dart';
+import '../../domain/entities/med_time.dart';
 import '../../domain/entities/parsed_prescription.dart';
 import '../../domain/entities/patient_profile.dart';
 import '../../domain/services/inference_engine.dart';
 import '../../domain/use_cases/confirm_prescription_use_case.dart';
 import '../../domain/use_cases/parse_prescription_use_case.dart';
+import '../../domain/use_cases/schedule_reminders_use_case.dart';
 import 'ai_providers.dart';
 import 'database_providers.dart';
+import 'reminder_providers.dart';
 
 // ─── Estados del flujo ────────────────────────────────────────────────────────
 
@@ -65,11 +69,13 @@ class PrescriptionFlowError extends PrescriptionFlowState {
 class PrescriptionFlowNotifier extends StateNotifier<PrescriptionFlowState> {
   final ParsePrescriptionUseCase parseUseCase;
   final ConfirmPrescriptionUseCase confirmUseCase;
+  final ScheduleRemindersUseCase scheduleRemindersUseCase;
   final InferenceEngine _engine;
 
   PrescriptionFlowNotifier({
     required this.parseUseCase,
     required this.confirmUseCase,
+    required this.scheduleRemindersUseCase,
   })  : _engine = const InferenceEngine(),
         super(const PrescriptionFlowIdle());
 
@@ -140,19 +146,35 @@ class PrescriptionFlowNotifier extends StateNotifier<PrescriptionFlowState> {
     }
   }
 
-  /// Persiste el tratamiento confirmado. La programación de recordatorios
-  /// ocurre en Fase 5 — aquí solo se guarda Medicamento + Tratamiento.
-  Future<void> confirmAndSave({required DateTime startDate}) async {
+  /// Persiste el tratamiento y programa los recordatorios locales.
+  Future<void> confirmAndSave({
+    required DateTime startDate,
+    List<TimeOfDay> confirmedTimes = const [],
+  }) async {
     final current = state;
     if (current is! PrescriptionFlowReviewSchedule) return;
 
     state = const PrescriptionFlowSaving();
     try {
-      final id = await confirmUseCase.execute(
+      final (:treatmentId, :patientId) = await confirmUseCase.execute(
         current.prescription,
         startDate: startDate,
       );
-      state = PrescriptionFlowSaved(id);
+
+      final medTimes =
+          confirmedTimes.map((t) => MedTime(t.hour, t.minute)).toList();
+
+      await scheduleRemindersUseCase.execute(
+        treatmentId: treatmentId,
+        patientId: patientId,
+        medicationName:
+            current.prescription.medicationName ?? 'Medicamento',
+        confirmedTimes: medTimes,
+        inferenceResult: current.inferenceResult,
+        startDate: startDate,
+      );
+
+      state = PrescriptionFlowSaved(treatmentId);
     } catch (e) {
       state = PrescriptionFlowError('Error al guardar el tratamiento: $e');
     }
@@ -178,5 +200,6 @@ final prescriptionFlowProvider =
   return PrescriptionFlowNotifier(
     parseUseCase: ref.watch(parsePrescriptionUseCaseProvider),
     confirmUseCase: ref.watch(confirmPrescriptionUseCaseProvider),
+    scheduleRemindersUseCase: ref.watch(scheduleRemindersUseCaseProvider),
   );
 });

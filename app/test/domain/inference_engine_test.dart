@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:med_control/domain/entities/inference_result.dart';
 import 'package:med_control/domain/entities/med_time.dart';
 import 'package:med_control/domain/entities/patient_profile.dart';
 import 'package:med_control/domain/entities/treatment_facts.dart';

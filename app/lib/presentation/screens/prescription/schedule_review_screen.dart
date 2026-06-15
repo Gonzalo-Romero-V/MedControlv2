@@ -107,7 +107,10 @@ class _ScheduleReviewScreenState extends ConsumerState<ScheduleReviewScreen> {
         isSaving: isSaving,
         onConfirm: () => ref
             .read(prescriptionFlowProvider.notifier)
-            .confirmAndSave(startDate: _startDate),
+            .confirmAndSave(
+              startDate: _startDate,
+              confirmedTimes: _confirmedTimes,
+            ),
       ),
     );
   }
