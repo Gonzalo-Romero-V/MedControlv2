@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../domain/entities/inference_result.dart';
 import '../../../domain/entities/med_time.dart';
 import '../../../domain/entities/parsed_prescription.dart';
+import '../../../domain/entities/treatment_facts.dart';
 import '../../providers/prescription_flow_provider.dart';
 
 /// Pantalla de revisión de horarios sugeridos por el motor de inferencia.
@@ -37,6 +38,39 @@ class _ScheduleReviewScreenState extends ConsumerState<ScheduleReviewScreen> {
     _confirmedTimes = widget.inferenceResult.suggestions
         .map((s) => TimeOfDay(hour: s.time.hour, minute: s.time.minute))
         .toList();
+  }
+
+  /// Intervalo entre tomas según la frecuencia de la prescripción.
+  /// Retorna null si el tipo de frecuencia no permite recalcular
+  /// (a demanda, única dosis, o sin valor).
+  Duration? get _interval {
+    final p = widget.prescription;
+    if (p.frequencyType == FrequencyType.everyNHours) {
+      final h = p.frequencyValue;
+      return h != null && h > 0 ? Duration(hours: h) : null;
+    }
+    if (p.frequencyType == FrequencyType.nTimesDay) {
+      final n = p.frequencyValue;
+      if (n == null || n <= 1) return null;
+      return Duration(minutes: (24 * 60 / n).round());
+    }
+    return null;
+  }
+
+  /// Recalcula todos los horarios a partir de [first] usando el intervalo.
+  void _recalculateFromFirst(TimeOfDay first) {
+    final interval = _interval;
+    if (interval == null) return;
+    setState(() {
+      for (var i = 0; i < _confirmedTimes.length; i++) {
+        final minutesFromMidnight =
+            first.hour * 60 + first.minute + i * interval.inMinutes;
+        _confirmedTimes[i] = TimeOfDay(
+          hour: (minutesFromMidnight ~/ 60) % 24,
+          minute: minutesFromMidnight % 60,
+        );
+      }
+    });
   }
 
   @override
@@ -81,6 +115,14 @@ class _ScheduleReviewScreenState extends ConsumerState<ScheduleReviewScreen> {
                       date: _startDate,
                       onChanged: (d) => setState(() => _startDate = d),
                     ),
+                    if (_interval != null && _confirmedTimes.length > 1) ...[
+                      const SizedBox(height: 12),
+                      _FirstDosePicker(
+                        firstTime: _confirmedTimes.first,
+                        interval: _interval!,
+                        onChanged: _recalculateFromFirst,
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     _SuggestionsSection(
                       suggestions: result.suggestions,
@@ -653,6 +695,105 @@ class _InferenceTracesExpansionState
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Picker de primera toma con recálculo automático.
+/// Muestra la hora de la primera toma y, al cambiarla,
+/// redistribuye todas las tomas según el intervalo de la prescripción.
+class _FirstDosePicker extends StatelessWidget {
+  final TimeOfDay firstTime;
+  final Duration interval;
+  final ValueChanged<TimeOfDay> onChanged;
+
+  const _FirstDosePicker({
+    required this.firstTime,
+    required this.interval,
+    required this.onChanged,
+  });
+
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  String _intervalLabel() {
+    final h = interval.inMinutes ~/ 60;
+    final m = interval.inMinutes % 60;
+    if (m == 0) return 'cada $h hs';
+    return 'cada ${h}h ${m}min';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () async {
+        final picked = await showTimePicker(
+          context: context,
+          initialTime: firstTime,
+          helpText: 'Hora de la primera toma — las siguientes se recalculan automáticamente',
+        );
+        if (picked != null) onChanged(picked);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: Theme.of(context).colorScheme.secondary.withOpacity(0.4)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.schedule,
+                color: Theme.of(context).colorScheme.onSecondaryContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ajustar primera toma',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    'Las siguientes se calculan ${_intervalLabel()} a partir de esta hora.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSecondaryContainer
+                              .withOpacity(0.7),
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondary,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _formatTime(firstTime),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Theme.of(context).colorScheme.onSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.edit, size: 16,
+                color: Theme.of(context).colorScheme.onSecondaryContainer),
+          ],
+        ),
+      ),
     );
   }
 }

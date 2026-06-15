@@ -8,6 +8,13 @@ import '../../infrastructure/database/daos/medication_dao.dart';
 import '../../infrastructure/database/daos/patient_dao.dart';
 import '../../infrastructure/database/daos/treatment_dao.dart';
 
+/// Thrown when the patient already has an active or suspended treatment
+/// for a medication with the same name or active ingredient.
+class DuplicateMedicationException implements Exception {
+  final String medicationName;
+  const DuplicateMedicationException(this.medicationName);
+}
+
 /// Persiste una receta revisada y aprobada por el usuario como Medicamento + Tratamiento en SQLite.
 ///
 /// Garantía: solo se llama después de que el usuario haya revisado y aprobado
@@ -26,12 +33,22 @@ class ConfirmPrescriptionUseCase {
   });
 
   /// Retorna el ID del tratamiento y del paciente activo.
+  ///
+  /// Throws [DuplicateMedicationException] if the patient already has an active
+  /// or suspended treatment for the same medication, unless [forceOverride] is true.
+  /// When a duplicate medication exists but has no active treatment, the existing
+  /// medication row is reused (avoids polluting the medications table).
   Future<({String treatmentId, String patientId})> execute(
     ParsedPrescription prescription, {
     DateTime? startDate,
+    bool forceOverride = false,
   }) async {
     final patientId = await _ensureActivePatient();
-    final medicationId = await _createMedication(prescription, patientId);
+    final medicationId = await _resolveOrCreateMedication(
+      prescription,
+      patientId,
+      forceOverride: forceOverride,
+    );
     final treatmentId = await _createTreatment(
       prescription,
       patientId,
@@ -54,15 +71,35 @@ class ConfirmPrescriptionUseCase {
     return id;
   }
 
-  Future<String> _createMedication(
+  Future<String> _resolveOrCreateMedication(
     ParsedPrescription prescription,
-    String patientId,
-  ) async {
+    String patientId, {
+    required bool forceOverride,
+  }) async {
+    final name = prescription.medicationName ?? 'Medicamento sin nombre';
+    final existing = await medicationDao.findDuplicate(
+      patientId,
+      name,
+      prescription.activeIngredient,
+    );
+
+    if (existing != null) {
+      // Check for active/suspended treatment — block unless user confirmed
+      if (!forceOverride) {
+        final conflicts = await treatmentDao.getConflicting(patientId, existing.id);
+        if (conflicts.isNotEmpty) {
+          throw DuplicateMedicationException(existing.name);
+        }
+      }
+      // Reuse existing medication row
+      return existing.id;
+    }
+
     final id = _uuid.v4();
     await medicationDao.insertMedication(MedicationsTableCompanion(
       id: Value(id),
       patientId: Value(patientId),
-      name: Value(prescription.medicationName ?? 'Medicamento sin nombre'),
+      name: Value(name),
       activeIngredient: Value(prescription.activeIngredient),
       presentation: const Value('tablet'),
     ));

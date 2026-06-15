@@ -137,3 +137,86 @@ Cada tratamiento conserva permanentemente:
 - Cambios de estado con timestamp y motivo
 
 El historial no se edita, solo se agrega.
+
+## Pipeline de parseo OCR → IA (Fase 3)
+La receta física se convierte en un `Tratamiento` en tres pasos:
+
+```
+Imagen
+  └─► ParsePrescriptionUseCase
+        ├─► Ruta 1 (online):  CloudVisionOcrService → GeminiParserService → ParsedPrescription
+        └─► Ruta 2 (offline): MlKitOcrService → formulario manual
+```
+
+### Entidad intermedia: `ParsedPrescription`
+
+Output tipado del pipeline OCR → IA. Contiene todos los campos de `Tratamiento` en forma nullable, más:
+- `rawOcrText` — texto crudo preservado como fuente
+- `rawAiResponse` — JSON crudo del modelo (trazabilidad)
+- `source: PrescriptionSource` — `cloudVisionGemini` | `mlkitManual`
+- `hasCriticalFields` — getter: bloquea confirmación si faltan campos críticos
+- `toTreatmentFacts()` — bridge hacia [[base-de-conocimiento]] para inferencia
+
+### Resultado del use case: `ParsePrescriptionResult` (sealed)
+
+| Caso | Tipo | Qué ocurre |
+|------|------|------------|
+| Online exitoso | `FullParse(prescription)` | Pantalla de revisión con todos los campos |
+| Solo OCR disponible | `OcrOnly(rawText)` | Formulario manual pre-poblado con texto |
+| Todo falló | `ParseFailure(message)` | Formulario manual vacío + mensaje de error |
+
+Code paths:
+```
+app/lib/domain/entities/parsed_prescription.dart
+app/lib/domain/use_cases/parse_prescription_use_case.dart
+```
+
+## Confirmación y persistencia (Fase 4)
+`ConfirmPrescriptionUseCase` es el punto de cierre del flujo de registro:
+1. Garantiza que existe un paciente activo (crea "Paciente principal" si no hay ninguno — bootstrap Phase 6).
+2. Crea una fila en `medications` con nombre, principio activo y presentación.
+3. Crea una fila en `treatments` con dosis, frecuencia, criterio de fin, fecha de inicio y origen (`ocr_ai` | `manual`).
+4. **No** crea recordatorios — eso es Phase 5.
+
+Code path: `app/lib/domain/use_cases/confirm_prescription_use_case.dart`
+
+## Implementación — Fase 7
+Historial de tratamientos con adherencia implementado en `c9913dd`.
+
+### Use case: `GetTreatmentHistoryUseCase`
+
+Carga todos los tratamientos del paciente activo enriquecidos con:
+- `medicationName` (join con `MedicationDao.getById`)
+- `remindersTotal` — total de recordatorios creados para el tratamiento (proxy de dosis esperadas)
+- `intakesTaken` — dosis confirmadas (`IntakeDao.countTaken`, cuenta `taken` + `taken_late`)
+- `adherence` — getter derivado: `intakesTaken / remindersTotal`
+
+Orden: activos primero, luego por `startDate` descendente.
+
+### ViewModel
+
+```dart
+class TreatmentHistoryViewModel {
+  final TreatmentsTableData treatment;
+  final String medicationName;
+  final int remindersTotal;
+  final int intakesTaken;
+  double get adherence => remindersTotal > 0 ? intakesTaken / remindersTotal : 0;
+}
+```
+
+### Pantallas (H5)
+
+| Pantalla | Descripción |
+|---|---|
+| `HistorialContent` | Lista de todos los tratamientos (tab 2 del `_MainShell`), card con `LinearProgressIndicator` de adherencia |
+| `TreatmentDetailScreen` | Detalle pushed vía Navigator: info del tratamiento, card de adherencia, listado de recordatorios con resultado de toma |
+
+### Code paths
+
+```
+app/lib/domain/use_cases/get_treatment_history_use_case.dart
+app/lib/presentation/providers/historial_providers.dart
+app/lib/presentation/features/historial/historial_screen.dart
+app/lib/presentation/features/historial/treatment_detail_screen.dart
+```

@@ -151,3 +151,44 @@ Calculada por tratamiento:
 - `tomas_tomadas` incluye `tomada` y `tomada_tarde`
 - Visible en el historial del tratamiento
 - No mostrada de forma prominente al paciente (puede generar ansiedad) — sí visible para el cuidador
+
+## Implementación — Fase 5
+El ciclo de vida completo de recordatorio + toma está implementado en `4dab5b2`.
+
+### Use cases (H4)
+
+| Use Case | Responsabilidad |
+|---|---|
+| `ScheduleRemindersUseCase` | Crea filas en `RemindersTable` + programa notificaciones diarias repetidas |
+| `GetTodayRemindersUseCase` | Lee recordatorios del día, enriquece con nombre de medicamento e `isCritical` → `ReminderViewModel` |
+| `RecordIntakeUseCase` | Crea fila en `IntakesTable`, actualiza estado del recordatorio, cancela notificación |
+| `SnoozeReminderUseCase` | Pospone 30 min (fijo MVP), máx 3 postposiciones; bloqueado para medicamentos críticos |
+
+### NotificationService (Infrastructure)
+
+Singleton `NotificationService.instance` inicializado en `main()`. Dos métodos:
+- `scheduleDaily()` — notificación que se repite diariamente a la misma hora (`matchDateTimeComponents: time`)
+- `scheduleOnce()` — disparo único para snooze
+
+Timezone hardcodeada a `America/Argentina/Buenos_Aires` (MVP); Phase 6 detecta timezone del dispositivo.
+
+### Diferencias con el spec del vault
+
+- Ventana de posposición MVP: **30 min fija** para todos los medicamentos (no `intervalo/2`). La variante dinámica requiere calcular el intervalo del tratamiento; pendiente para Phase 6.
+- Snooze máx: 3 para no-críticos; 0 para críticos (alineado con el spec).
+- `minutesLate > 15` → resultado `taken_late`; ≤ 15 min → `taken` (umbral pragmático MVP).
+
+### Code paths
+
+```
+app/lib/domain/use_cases/schedule_reminders_use_case.dart
+app/lib/domain/use_cases/get_today_reminders_use_case.dart
+app/lib/domain/use_cases/record_intake_use_case.dart
+app/lib/domain/use_cases/snooze_reminder_use_case.dart
+app/lib/infrastructure/notifications/notification_service.dart
+app/lib/presentation/features/today_reminders/today_reminders_screen.dart
+app/lib/presentation/providers/reminder_providers.dart
+```
+
+## Timezone detection — resuelta (14ad78d)
+La sección 'Implementación Fase 5' decía: "Phase 6 detecta timezone del dispositivo". La detección real se implementó en `14ad78d` (posterior a Fase 6): `flutter_timezone ^5.1.0` → `FlutterTimezone.getLocalTimezone().identifier` → `tz.setLocalLocation()`. Fallback a `America/Argentina/Buenos_Aires` si el platform channel falla.

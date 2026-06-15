@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../entities/parsed_prescription.dart';
 import '../services/ai_parser_service.dart';
 import '../services/ocr_service.dart';
@@ -7,16 +9,20 @@ import '../services/ocr_service.dart';
 /// Resultado del pipeline de parseo de receta.
 sealed class ParsePrescriptionResult {}
 
-/// Ruta 1 exitosa: Cloud Vision + AI parser → entidades estructuradas.
+/// Ruta 1 exitosa: OCR + AI parser → entidades estructuradas.
+/// [usedCloudVision] = true si Cloud Vision hizo el OCR; false si fue ML Kit.
 final class FullParse extends ParsePrescriptionResult {
   final ParsedPrescription prescription;
-  FullParse(this.prescription);
+  final bool usedCloudVision;
+  FullParse(this.prescription, {required this.usedCloudVision});
 }
 
-/// Ruta 2 (fallback offline): ML Kit → solo texto crudo para formulario manual.
+/// OCR exitoso pero sin parseo IA → solo texto crudo para formulario manual.
+/// [usedCloudVision] = true si Cloud Vision hizo el OCR; false si fue ML Kit.
 final class OcrOnly extends ParsePrescriptionResult {
   final String rawText;
-  OcrOnly(this.rawText);
+  final bool usedCloudVision;
+  OcrOnly(this.rawText, {required this.usedCloudVision});
 }
 
 /// Ambas rutas fallaron — mostrar formulario manual vacío + mensaje.
@@ -44,34 +50,59 @@ class ParsePrescriptionUseCase {
   /// Lo provee el provider Riverpod leyendo el env. Determina si se intenta Ruta 1.
   final bool visionKeyAvailable;
 
+  final bool aiKeyAvailable;
+
   const ParsePrescriptionUseCase({
     required this.cloudOcr,
     required this.localOcr,
     required this.aiParser,
     required this.visionKeyAvailable,
+    required this.aiKeyAvailable,
   });
 
   Future<ParsePrescriptionResult> execute(File imageFile) async {
-    // Ruta 1: requiere VISION_API_KEY + conectividad
+    debugPrint('[Pipeline] visionKey=$visionKeyAvailable aiKey=$aiKeyAvailable');
+
+    // Paso 1: Obtener texto OCR — Cloud Vision preferido, ML Kit como fallback
+    String? ocrText;
+    bool usedCloudVision = false;
+
     if (visionKeyAvailable) {
       try {
-        final ocrText = await cloudOcr.extractText(imageFile);
-        final prescription = await aiParser.parse(ocrText);
-        return FullParse(prescription);
-      } catch (_) {
-        // Cualquier error de red o API → caer a Ruta 2
+        ocrText = await cloudOcr.extractText(imageFile);
+        usedCloudVision = true;
+        debugPrint('[Pipeline] Cloud Vision OK — ${ocrText.length} chars');
+      } catch (e) {
+        debugPrint('[Pipeline] Cloud Vision FAILED: $e');
       }
     }
 
-    // Ruta 2: ML Kit on-device
-    try {
-      final rawText = await localOcr.extractText(imageFile);
-      return OcrOnly(rawText);
-    } catch (e) {
-      return ParseFailure(
-        'No se pudo extraer texto de la imagen. '
-        'Podés ingresar los datos manualmente.',
-      );
+    if (ocrText == null) {
+      try {
+        ocrText = await localOcr.extractText(imageFile);
+        debugPrint('[Pipeline] ML Kit OK — ${ocrText.length} chars');
+      } catch (e) {
+        debugPrint('[Pipeline] ML Kit FAILED: $e');
+        return ParseFailure(
+          'No se pudo extraer texto de la imagen. '
+          'Podés ingresar los datos manualmente.',
+        );
+      }
     }
+
+    // Paso 2: Parseo IA con el texto disponible (Cloud Vision o ML Kit)
+    if (aiKeyAvailable) {
+      try {
+        final prescription = await aiParser.parse(ocrText);
+        debugPrint('[Pipeline] AI parse OK → FullParse (cloudVision=$usedCloudVision)');
+        return FullParse(prescription, usedCloudVision: usedCloudVision);
+      } catch (e) {
+        debugPrint('[Pipeline] AI parse FAILED: $e');
+        return OcrOnly(ocrText, usedCloudVision: usedCloudVision);
+      }
+    }
+
+    debugPrint('[Pipeline] No AI key → OcrOnly (cloudVision=$usedCloudVision)');
+    return OcrOnly(ocrText, usedCloudVision: usedCloudVision);
   }
 }

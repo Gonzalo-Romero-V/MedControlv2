@@ -88,3 +88,52 @@ El `AiParserService` activo se inyecta vía Riverpod provider leyendo `AI_PROVID
 - [ ] iOS mínimo: confirmar al momento de setup Xcode
 - [ ] Gemini model: `gemini-1.5-flash` (velocidad) vs `gemini-1.5-pro` (precisión) — evaluar con recetas reales
 - [ ] Parser fallback offline post-MVP: formulario manual es suficiente para MVP
+
+## Pipeline OCR → IA — estado Fase 3
+Implementación verificada en `e65de7e`. Los detalles que difieren del diseño inicial:
+
+- **Cloud Vision**: autenticación por **service account JSON** (no API key). El archivo JSON se distribuye como Flutter asset, gitignoreado. Paquete: `googleapis_auth: ^2.0.0` con `clientViaServiceAccount()`. Variable de entorno: `VISION_CREDENTIALS_PATH` (path del asset).
+- **Gemini**: modelo `gemini-1.5-flash` deprecado — reemplazado por `gemini-2.0-flash`. Actualizar `.env` si se tenía el valor anterior.
+- **Diseño modular confirmado**: `OcrService` y `AiParserService` son interfaces abstractas en Domain; implementaciones en Data son intercambiables sin tocar lógica de negocio.
+
+Code paths:
+```
+Domain (contratos):
+  app/lib/domain/services/ocr_service.dart
+  app/lib/domain/services/ai_parser_service.dart
+  app/lib/domain/entities/parsed_prescription.dart
+  app/lib/domain/use_cases/parse_prescription_use_case.dart
+
+Data (implementaciones):
+  app/lib/data/services/cloud_vision_ocr_service.dart
+  app/lib/data/services/mlkit_ocr_service.dart
+  app/lib/data/services/gemini_parser_service.dart
+  app/lib/data/services/openai_parser_service.dart
+  app/lib/data/services/prescription_prompt.dart
+
+Presentation:
+  app/lib/presentation/providers/ai_providers.dart
+```
+
+Tests de integración verificados: Cloud Vision (auth + API call) ✅, OpenAI 3/3 ✅, Gemini estructuralmente correcto (quota agotada en sesión de prueba).
+
+## Notificaciones locales — estado Fase 5
+Activos desde `4dab5b2`:
+
+| Paquete | Versión | Rol |
+|---|---|---|
+| `flutter_local_notifications` | ^18.0.1 | Programación de alarmas locales (Android exactas, iOS con permiso) |
+| `timezone` | ^0.9.4 | Conversión de `DateTime` local → `TZDateTime` requerido por `zonedSchedule` |
+
+Canal Android: `med_control_reminders`, `Importance.high`.
+Timezone MVP: `America/Argentina/Buenos_Aires` (hardcoded; Phase 6 detecta del dispositivo).
+Permisos Android 12+: `SCHEDULE_EXACT_ALARM` necesario para `exactAllowWhileIdle`; se solicita en tiempo de ejecución.
+
+## Notificaciones locales — timezone detection (14ad78d)
+Timezone detection implementada en `14ad78d`. `notification_service.dart` usa `flutter_timezone ^5.1.0`: `FlutterTimezone.getLocalTimezone().identifier` obtiene el IANA name del dispositivo en runtime; fallback a `America/Argentina/Buenos_Aires` si el platform channel falla.
+
+La promesa de las secciones Fase 5 de `stack.md` y `recordatorio.md` ("Phase 6 detecta timezone del dispositivo") queda resuelta aquí.
+
+### Decisión: modelo Gemini — resuelta en Fase 3
+
+`gemini-2.0-flash` reemplazó a `gemini-1.5-flash` (deprecado) desde `e65de7e`. El checkbox en 'Decisiones pendientes' es historial; la decisión está cerrada.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../domain/entities/med_time.dart';
+import '../../../infrastructure/notifications/notification_service.dart';
 import '../../providers/patient_providers.dart';
 
 class ProfileSettingsScreen extends ConsumerStatefulWidget {
@@ -31,11 +32,18 @@ class _ProfileSettingsScreenState
 
   bool _saving = false;
   bool _initialized = false;
+  bool _requestingFsiPermission = false;
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController();
+    // Defaults prevent LateInitializationError on first frame before stream emits
+    _breakfastTime = const TimeOfDay(hour: 7, minute: 0);
+    _lunchTime = const TimeOfDay(hour: 13, minute: 0);
+    _dinnerTime = const TimeOfDay(hour: 19, minute: 0);
+    _sleepTime = const TimeOfDay(hour: 21, minute: 0);
+    _accessibility = const AccessibilityConfig();
   }
 
   @override
@@ -101,6 +109,23 @@ class _ProfileSettingsScreenState
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _requestFullScreenPermission() async {
+    setState(() => _requestingFsiPermission = true);
+    try {
+      final granted = await NotificationService.instance
+          .requestFullScreenIntentPermission();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(granted
+            ? 'Permiso concedido. Las alarmas aparecerán sobre otras apps ✓'
+            : 'Permiso no concedido. Las alarmas solo aparecerán al bloquear la pantalla.'),
+        duration: const Duration(seconds: 4),
+      ));
+    } finally {
+      if (mounted) setState(() => _requestingFsiPermission = false);
     }
   }
 
@@ -216,6 +241,35 @@ class _ProfileSettingsScreenState
                 value: _accessibility.reduceAnimations,
                 onChanged: (v) => setState(() =>
                     _accessibility = _accessibility.copyWith(reduceAnimations: v)),
+              ),
+              const SizedBox(height: 24),
+              _SectionHeader('Alertas de medicamentos'),
+              const SizedBox(height: 8),
+              Text(
+                'Elegí cómo te avisa la app cuando es hora de tomar el medicamento.',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 12),
+              _NotificationModeSelector(
+                value: _accessibility.notificationMode,
+                onChanged: (v) => setState(
+                    () => _accessibility = _accessibility.copyWith(notificationMode: v)),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                child: _accessibility.notificationMode == NotificationMode.active
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _FullScreenPermissionBanner(
+                          requesting: _requestingFsiPermission,
+                          onRequest: _requestFullScreenPermission,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
               const SizedBox(height: 32),
               FilledButton(
@@ -364,6 +418,186 @@ class _FontSizeSelector extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _NotificationModeSelector extends StatelessWidget {
+  final NotificationMode value;
+  final ValueChanged<NotificationMode> onChanged;
+
+  const _NotificationModeSelector({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _ModeCard(
+          mode: NotificationMode.active,
+          selected: value == NotificationMode.active,
+          icon: Icons.notifications_active,
+          title: 'Alerta activa',
+          description: 'Sonido + vibración fuerte. Aparece aunque el teléfono esté bloqueado. '
+              'Recomendado para no olvidar ninguna toma.',
+          onTap: () => onChanged(NotificationMode.active),
+        ),
+        const SizedBox(height: 8),
+        _ModeCard(
+          mode: NotificationMode.subtle,
+          selected: value == NotificationMode.subtle,
+          icon: Icons.vibration,
+          title: 'Discreta',
+          description: 'Solo vibración, sin sonido. Para entornos tranquilos o quienes prefieren menos ruido.',
+          onTap: () => onChanged(NotificationMode.subtle),
+        ),
+      ],
+    );
+  }
+}
+
+class _ModeCard extends StatelessWidget {
+  final NotificationMode mode;
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String description;
+  final VoidCallback onTap;
+
+  const _ModeCard({
+    required this.mode,
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected
+        ? Theme.of(context).colorScheme.primary
+        : Colors.grey.shade400;
+    final bg = selected
+        ? Theme.of(context).colorScheme.primaryContainer
+        : Colors.grey.shade50;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? Theme.of(context).colorScheme.primary : Colors.grey.shade300,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: selected
+                          ? Theme.of(context).colorScheme.onPrimaryContainer
+                          : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: selected
+                              ? Theme.of(context).colorScheme.onPrimaryContainer
+                              : Colors.grey.shade600,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected) Icon(Icons.check_circle, color: color),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Banner de permiso pantalla completa ─────────────────────────────────────
+
+class _FullScreenPermissionBanner extends StatelessWidget {
+  const _FullScreenPermissionBanner({
+    required this.requesting,
+    required this.onRequest,
+  });
+
+  final bool requesting;
+  final VoidCallback onRequest;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.secondary.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: cs.secondary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Alarma sobre otras apps (Android 14+)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: cs.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Para que la alarma aparezca aunque estés usando otra app, '
+                  'concedé el permiso "Notificaciones de pantalla completa" en Ajustes.',
+                  style: TextStyle(fontSize: 12, color: cs.onSecondaryContainer),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 34,
+                  child: FilledButton.tonal(
+                    onPressed: requesting ? null : onRequest,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                    child: requesting
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Verificar / Conceder permiso'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

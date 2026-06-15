@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "domain/base-de-conocimiento.md",
+                "file": "decisions/roadmap.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "base-de-conocimiento"
+              "title": "roadmap"
             }
           }
         ]
@@ -182,11 +182,13 @@
   },
   "active": "22a5d4442eccc411",
   "lastOpenFiles": [
+    "domain/recordatorio.md",
+    "decisions/roadmap.md",
     "domain/base-de-conocimiento.md",
+    "decisions/roadmap.md.tmp.9632.a6ef3742838f",
     "domain/base-de-conocimiento.md.tmp.9632.1e5d1da5df0e",
     "domain/paciente.md",
     "domain/paciente.md.tmp.9632.de2c1445ef49",
-    "domain/recordatorio.md",
     "domain/recordatorio.md.tmp.9632.b39f218f57f1",
     "domain/medicamento.md",
     "domain/medicamento.md.tmp.9632.485d0ce6cbc1",
@@ -196,7 +198,6 @@
     "domain/entity.md",
     "INDEX.md",
     "decisions/architecture.md.tmp.9632.95b5e5c82c82",
-    "decisions/stack.md.tmp.9632.3b18682cc07a",
-    "intent/vision.md.tmp.9632.535d6617a7ce"
+    "decisions/stack.md.tmp.9632.3b18682cc07a"
   ]
 }

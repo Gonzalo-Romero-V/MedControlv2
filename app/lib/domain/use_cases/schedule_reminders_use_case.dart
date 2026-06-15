@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../entities/inference_result.dart';
@@ -23,6 +24,7 @@ class ScheduleRemindersUseCase {
     required List<MedTime> confirmedTimes,
     required InferenceResult inferenceResult,
     required DateTime startDate,
+    bool useAlertMode = true,
   }) async {
     if (inferenceResult.isOnDemand) return;
     if (confirmedTimes.isEmpty) return;
@@ -30,7 +32,10 @@ class ScheduleRemindersUseCase {
     final snoozeWindow =
         inferenceResult.snoozePolicy?.window ?? const Duration(hours: 1);
 
+    final isCritical = inferenceResult.snoozePolicy?.isCritical ?? false;
+
     final companions = <RemindersTableCompanion>[];
+    final notifSchedules = <({int notifId, String reminderId, DateTime scheduledTime, String? body})>[];
 
     for (var i = 0; i < confirmedTimes.length; i++) {
       final time = confirmedTimes[i];
@@ -38,10 +43,16 @@ class ScheduleRemindersUseCase {
           ? inferenceResult.suggestions[i]
           : null;
 
-      final scheduledTime = DateTime(
+      // If the computed time is already in the past (e.g. user saved at 23:59
+      // with a suggested breakfast time of 07:00), advance to the next day so
+      // the first notification fires at the correct upcoming occurrence.
+      var scheduledTime = DateTime(
         startDate.year, startDate.month, startDate.day,
         time.hour, time.minute,
       );
+      if (scheduledTime.isBefore(DateTime.now())) {
+        scheduledTime = scheduledTime.add(const Duration(days: 1));
+      }
 
       final id = const Uuid().v4();
       final ruleId = (suggestion?.ruleIds.isNotEmpty ?? false)
@@ -60,15 +71,38 @@ class ScheduleRemindersUseCase {
         ruleExplanation: Value(suggestion?.explanation ?? ''),
       ));
 
-      final notifId = id.hashCode.abs() & 0x7FFFFFFF;
-      await notificationService.scheduleDaily(
-        id: notifId,
-        medicationName: medicationName,
+      notifSchedules.add((
+        notifId: id.hashCode.abs() & 0x7FFFFFFF,
+        reminderId: id,
         scheduledTime: scheduledTime,
         body: suggestion?.explanation,
-      );
+      ));
     }
 
+    // Persist reminders first — always succeeds unless the DB is broken
     await reminderDao.insertAll(companions);
+
+    // Schedule notifications — graceful degradation: a failed notification
+    // does not cancel the saved treatment or reminder records
+    for (final n in notifSchedules) {
+      try {
+        await notificationService.scheduleDaily(
+          id: n.notifId,
+          reminderId: n.reminderId,
+          medicationName: medicationName,
+          scheduledTime: n.scheduledTime,
+          body: n.body,
+          useAlertMode: useAlertMode,
+          isCritical: isCritical,
+        );
+        debugPrint(
+          '[Notifications] Scheduled notif ${n.notifId} '
+          'for ${n.scheduledTime.toIso8601String()} '
+          '(alertMode=$useAlertMode, critical=$isCritical)',
+        );
+      } catch (e, st) {
+        debugPrint('[Notifications] FAILED notif ${n.notifId}: $e\n$st');
+      }
+    }
   }
 }

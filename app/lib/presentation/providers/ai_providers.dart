@@ -50,9 +50,14 @@ final localOcrServiceProvider = Provider<OcrService>((ref) {
   return MlKitOcrService();
 });
 
-/// true si VISION_CREDENTIALS_PATH está configurada → habilita Ruta 1 (Cloud Vision).
+/// true si VISION_CREDENTIALS_PATH está configurada → habilita Cloud Vision OCR.
 final visionKeyAvailableProvider = Provider<bool>((ref) {
   return _isSet('VISION_CREDENTIALS_PATH');
+});
+
+/// true si AI_API_KEY está configurada → habilita parseo IA de recetas.
+final aiKeyAvailableProvider = Provider<bool>((ref) {
+  return _isSet('AI_API_KEY');
 });
 
 /// Use case orquestador del pipeline completo.
@@ -62,5 +67,6 @@ final parsePrescriptionUseCaseProvider = Provider<ParsePrescriptionUseCase>((ref
     localOcr: ref.watch(localOcrServiceProvider),
     aiParser: ref.watch(aiParserServiceProvider),
     visionKeyAvailable: ref.watch(visionKeyAvailableProvider),
+    aiKeyAvailable: ref.watch(aiKeyAvailableProvider),
   );
 });

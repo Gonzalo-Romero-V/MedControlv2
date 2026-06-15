@@ -10,6 +10,10 @@ class ReminderDao extends DatabaseAccessor<AppDatabase>
     with _$ReminderDaoMixin {
   ReminderDao(super.db);
 
+  Future<RemindersTableData?> getById(String id) =>
+      (select(remindersTable)..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+
   Future<List<RemindersTableData>> getForDay(
       String patientId, DateTime day) {
     final start = DateTime(day.year, day.month, day.day);

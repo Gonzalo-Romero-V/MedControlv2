@@ -123,3 +123,176 @@ El modelo de datos se diseña desde el inicio para soportar N pacientes por disp
 - [ ] TalkBack / VoiceOver: ¿MVP o fase 2?
 - [ ] Estrategia de backup local: export a archivo vs sync cloud futuro
 - [ ] UI multi-paciente: ¿selector de perfil activo o tabs simultáneos?
+
+## Flujo principal — estado Fase 4
+El flujo documentado arriba está implementado en `b016c00`. La pantalla de revisión es el invariante central — sin ella no se guarda nada.
+
+### State machine: `PrescriptionFlowNotifier`
+
+```
+idle
+  └─► parsing          (ParsePrescriptionUseCase corriendo)
+        ├─► reviewPrescription   (FullParse → form pre-poblado con badges IA)
+        │     ├─► reviewSchedule (InferenceEngine → horarios + trazas visibles)
+        │     │     ├─► saving
+        │     │     │     └─► saved  (ConfirmPrescriptionUseCase → DB)
+        │     │     └─► back → reviewPrescription
+        │     └─► (botón deshabilitado si faltan campos críticos)
+        ├─► reviewPrescription   (OcrOnly → form manual pre-poblado con texto OCR)
+        └─► error               (ParseFailure → mensaje + opción manual)
+```
+
+Escape hatch: `backToReviewPrescription()` permite corregir datos desde la pantalla de horarios.
+
+### Pantalla de revisión — invariante de UI
+
+- Badge "IA" por campo con valor extraído automáticamente
+- Campos críticos faltantes: borde rojo + texto "Campo requerido"
+- Botón "Calcular horarios" gateado por `ParsedPrescription.hasCriticalFields`
+- El usuario puede editar cualquier campo antes de continuar
+
+### Pantalla de horarios — explicabilidad
+
+- Cada `SuggestedTime` muestra `InferenceTrace.explanation` en lenguaje natural
+- Cada horario es ajustable con TimePicker nativo
+- `ConflictAlert` (R10) visible prominentemente antes de confirmar
+- Política de posposición (R08/R09) indicada al pie
+
+### Nota sobre Phase 5
+
+`confirmAndSave()` persiste Medicamento + Tratamiento pero **no** crea filas en `RemindersTable`. La programación de notificaciones locales es Phase 5.
+
+Code paths:
+```
+app/lib/presentation/providers/prescription_flow_provider.dart  — PrescriptionFlowNotifier
+app/lib/domain/use_cases/confirm_prescription_use_case.dart     — persistencia H4
+app/lib/presentation/screens/prescription/                      — 4 screens H5
+app/lib/presentation/providers/database_providers.dart          — Riverpod DB wiring
+```
+
+## Flujo principal — estado Fase 5
+La nota anterior ('Fase 4') decía que `confirmAndSave()` no creaba filas en `RemindersTable`. En `4dab5b2` esto quedó resuelto.
+
+### Extensión del flujo post-confirmación
+
+```
+confirmAndSave(startDate, confirmedTimes)
+  └─► ConfirmPrescriptionUseCase.execute()   → (treatmentId, patientId)
+  └─► ScheduleRemindersUseCase.execute()
+         ├─► RemindersTable.insertAll()        → filas en SQLite
+         └─► NotificationService.scheduleDaily() × N   → notificaciones locales
+  └─► state = PrescriptionFlowSaved(treatmentId)
+```
+
+### TodayRemindersScreen — arquitectura
+
+- `todayRemindersProvider: FutureProvider<List<ReminderViewModel>>` — se invalida tras cada acción
+- `ReminderViewModel` = `RemindersTableData` + `medicationName` + `isCritical`
+- Action sheet → `RecordIntakeUseCase` o `SnoozeReminderUseCase` → `ref.invalidate(todayRemindersProvider)`
+
+### NotificationService
+
+Singleton en `infrastructure/notifications/`. Inicializado antes de `runApp()` en `main.dart`.
+No es un Riverpod `FutureProvider` para evitar complejidad de async en la cadena de dependencias — la inicialización es síncrona a efectos prácticos (< 50ms).
+
+Code paths:
+```
+app/lib/infrastructure/notifications/notification_service.dart
+app/lib/presentation/providers/reminder_providers.dart
+app/lib/main.dart  — NotificationService.instance.initialize()
+```
+
+## Flujo principal — estado Fase 6
+### Tema reactivo
+
+`app.dart` ya no tiene `ThemeData` estático. Lee `appThemeProvider` que deriva de `accessibilityConfigProvider → activePatientProvider`. Cuando el usuario guarda configuración de accesibilidad, el tema cambia sin rebuild del árbol completo.
+
+### Routing por tipo de perfil
+
+```dart
+// app.dart
+home: isAssisted ? const AssistedModeScreen() : const TodayRemindersScreen()
+```
+
+El switch ocurre reactivamente al cambiar `profileType` en la DB. No hay Navigator push/pop — es un swap de `home`.
+
+### Eliminación de _HomeScreen
+
+`_HomeScreen` era un shell Scaffold que envolvía `TodayRemindersScreen` para darle el FAB. En Fase 6 se eliminó: el FAB y el botón de perfil viven en `TodayRemindersScreen.appBar.actions` y `floatingActionButton`.
+
+### Accesibilidad → ThemeData
+
+| Config | Efecto en ThemeData |
+|---|---|
+| `fontSize: large/veryLarge` | `textTheme.apply(fontSizeFactor: 1.3/1.5)` |
+| `highContrast: true` | `ColorScheme.light` con primary=black, surface=white |
+| `largeTargets: true` | `materialTapTargetSize: padded` |
+| `reduceAnimations` | Sin efecto en ThemeData MVP — Phase 7 puede desactivar animaciones con `AnimationController.duration = 0` |
+
+## Flujo principal — estado Fase 7
+### _MainShell con NavigationBar
+
+En `c9913dd`, `TodayRemindersScreen` dejó de ser el `home` directo en modo autónomo. El nuevo shell es `_MainShell` (`ConsumerStatefulWidget` en `app.dart`).
+
+```dart
+// app.dart — Fase 7
+home: isAssisted ? const AssistedModeScreen() : const _MainShell()
+```
+
+`_MainShell` provee:
+- `Scaffold` con `NavigationBar` de 3 destinos
+- `IndexedStack` con `TodayRemindersContent` / `HistorialContent` / `KnowledgeBaseContent`
+- FAB ("Registrar receta" → `PrescriptionFlowScreen`) visible solo en tab 0
+- AppBar con acciones (refresh + perfil) visibles solo en tab 0
+
+`TodayRemindersScreen` se renombró a `TodayRemindersContent` y ya no incluye Scaffold. Esto evita anidar Scaffolds y centraliza la navegación principal.
+
+### Corrección nota Fase 6
+
+La sección "Routing por tipo de perfil — Fase 6" decía `home: ... const TodayRemindersScreen()`. El estado correcto desde Fase 7 es `const _MainShell()`. El comportamiento reactivo de routing por `profileType` se mantiene igual.
+
+### Providers de historial
+
+```
+treatmentHistoryProvider  FutureProvider<List<TreatmentHistoryViewModel>>
+activeFactsProvider       FutureProvider<List<ActiveTreatmentFact>>   — para KnowledgeBaseContent
+remindersByTreatmentProvider  FutureProvider.family<List<RemindersTableData>, String>
+intakesByTreatmentProvider    FutureProvider.family<List<IntakesTableData>, String>
+```
+
+## Flujo principal — estado Fase 8
+### Pull-to-refresh
+
+`TodayRemindersContent` y `HistorialContent` envuelven su contenido en `RefreshIndicator`. El patrón usado:
+
+```dart
+onRefresh: () {
+  ref.invalidate(provider);
+  return ref.read(provider.future); // RefreshIndicator espera a que resuelva
+}
+```
+
+Para estados vacíos (no-scrollable), se usa `LayoutBuilder` → `ListView(AlwaysScrollableScrollPhysics)` → `SizedBox(height: constraints.maxHeight)` para que el pull siga funcionando.
+
+### reduceAnimations en ThemeData
+
+```dart
+pageTransitionsTheme: config.reduceAnimations
+    ? PageTransitionsTheme(builders: {
+        android: _InstantPageTransitionsBuilder(),
+        ios: _InstantPageTransitionsBuilder(),
+      })
+    : const PageTransitionsTheme()
+```
+
+Combinado con `themeAnimationDuration: reduceAnimations ? Duration.zero : 200ms` en `MaterialApp`, cubre tanto transiciones de ruta como animaciones de tema.
+
+### Estado de primer uso
+
+El routing del `_MainShell` no cambia. Dentro de `TodayRemindersContent`, si `activePatientProvider.hasValue && activePatientProvider.value == null` → se muestra el estado de bienvenida. El paciente se crea en `ConfirmPrescriptionUseCase` al confirmar la primera receta — a partir de ese momento el estado de bienvenida nunca vuelve a aparecer.
+
+## TalkBack / VoiceOver — estado Fase 8
+La decisión pendiente '¿MVP o fase 2?' está parcialmente resuelta:
+
+- **Implementado en MVP**: `Semantics(label, value)` en todos los `LinearProgressIndicator` de adherencia (`HistorialContent._TreatmentCard` y `TreatmentDetailScreen._AdherenceCard`). Anunciado a TalkBack / VoiceOver con etiqueta legible (*'Adherencia al tratamiento — X por ciento'*).
+- **Post-MVP**: validación formal con lector de pantalla real en el resto de la app; navegación semántica completa entre secciones.

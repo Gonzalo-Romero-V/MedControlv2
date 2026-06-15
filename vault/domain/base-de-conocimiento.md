@@ -193,3 +193,29 @@ El parámetro `conflictingMedications` lo provee el use case consultando el repo
 Reglas R01–R10 implementadas. R11–R13 (lifecycle) son responsabilidad de use cases.
 
 Coverage: 45 tests unitarios en `app/test/domain/inference_engine_test.dart`.
+
+## Visualización — Fase 7
+La BC tiene ahora una interfaz visual en `KnowledgeBaseContent` (tab "BC" del `_MainShell`), implementada en `c9913dd`.
+
+### Secciones de la pantalla
+
+**1. Sistema de producción** — card descriptivo con la arquitectura del motor (forward chaining, 13 reglas, entrada/salida).
+
+**2. Catálogo de reglas (R01–R13)** — `ExpansionTile` por regla con:
+- ID + nombre de la regla
+- Capa de pertenencia (`Horario` / `Validación` / `Snooze` / `Seguridad` / `Lifecycle`)
+- Condición de activación
+- Conclusión producida
+
+**3. Hechos activos** — carga dinámica via `activeFactsProvider`: por cada tratamiento activo muestra los `ruleId` aplicados (extraídos de `reminders.ruleId`), con chip por regla en el color de su capa. Si no hay tratamientos activos, mensaje vacío.
+
+### Relevancia académica
+
+Esta pantalla materializa el argumento de la defensa: el sistema muestra explícitamente su conocimiento (reglas) y cómo lo aplicó (hechos activos con trazas). El usuario puede ver, en tiempo real, cuáles reglas del catálogo se activaron para su medicación.
+
+### Code path
+
+```
+app/lib/presentation/features/knowledge_base/knowledge_base_screen.dart
+app/lib/presentation/providers/historial_providers.dart  — activeFactsProvider
+```

@@ -16,11 +16,13 @@ import '../../providers/prescription_flow_provider.dart';
 class PrescriptionReviewScreen extends ConsumerStatefulWidget {
   final ParsedPrescription prescription;
   final bool isAiParsed;
+  final bool usedCloudVision;
 
   const PrescriptionReviewScreen({
     super.key,
     required this.prescription,
     required this.isAiParsed,
+    this.usedCloudVision = false,
   });
 
   @override
@@ -46,11 +48,13 @@ class _PrescriptionReviewScreenState
   String? _endCriterionType;
   bool _isCritical = false;
 
-  bool _showOcrText = false;
+  late bool _showOcrText;
 
   @override
   void initState() {
     super.initState();
+    // Auto-expand OCR text in OcrOnly mode so the user can see what was captured
+    _showOcrText = !widget.isAiParsed && widget.prescription.rawOcrText.isNotEmpty;
     final p = widget.prescription;
     _medicationNameCtrl = TextEditingController(text: p.medicationName ?? '');
     _activeIngredientCtrl =
@@ -144,7 +148,10 @@ class _PrescriptionReviewScreenState
       ),
       body: Column(
         children: [
-          _ReviewBanner(isAiParsed: widget.isAiParsed),
+          _ReviewBanner(
+            isAiParsed: widget.isAiParsed,
+            usedCloudVision: widget.usedCloudVision,
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -306,7 +313,10 @@ class _PrescriptionReviewScreenState
 
 class _ReviewBanner extends StatelessWidget {
   final bool isAiParsed;
-  const _ReviewBanner({required this.isAiParsed});
+  final bool usedCloudVision;
+  const _ReviewBanner({required this.isAiParsed, required this.usedCloudVision});
+
+  String get _ocrLabel => usedCloudVision ? 'Cloud Vision' : 'ML Kit (offline)';
 
   @override
   Widget build(BuildContext context) {
@@ -323,8 +333,8 @@ class _ReviewBanner extends StatelessWidget {
           Expanded(
             child: Text(
               isAiParsed
-                  ? 'Datos extraídos por IA. Revisá y corregí cualquier campo antes de continuar.'
-                  : 'Completá los datos de la receta manualmente.',
+                  ? 'OCR: $_ocrLabel • IA completó el formulario. Revisá y corregí cualquier campo antes de continuar.'
+                  : 'OCR: $_ocrLabel • El texto capturado se muestra abajo. Completá los campos manualmente.',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onPrimaryContainer,
                 fontSize: 13,

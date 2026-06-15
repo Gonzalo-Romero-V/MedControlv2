@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../infrastructure/notifications/notification_service.dart';
+import '../infrastructure/notifications/pending_alarm_notifier.dart';
+import 'features/alarm/alarm_screen.dart';
 import 'features/assisted_mode/assisted_mode_screen.dart';
 import 'features/historial/historial_screen.dart';
 import 'features/knowledge_base/knowledge_base_screen.dart';
@@ -42,6 +46,46 @@ class _MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<_MainShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    pendingAlarmNotifier.addListener(_onPendingAlarm);
+    // Handle a response that was set before this widget was built
+    // (app-killed case: set in main() before runApp).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onPendingAlarm());
+  }
+
+  @override
+  void dispose() {
+    pendingAlarmNotifier.removeListener(_onPendingAlarm);
+    super.dispose();
+  }
+
+  void _onPendingAlarm() {
+    final response = pendingAlarmNotifier.value;
+    if (response == null || !mounted) return;
+    pendingAlarmNotifier.value = null;
+    _navigateToAlarm(response);
+  }
+
+  void _navigateToAlarm(NotificationResponse response) {
+    final parsed = NotificationService.parsePayload(response.payload);
+    if (parsed == null) return;
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        fullscreenDialog: true,
+        pageBuilder: (context, anim, secondaryAnim) => AlarmScreen(
+          reminderId: parsed.reminderId,
+          medicationName: parsed.medicationName,
+          isCritical: parsed.isCritical,
+        ),
+        transitionsBuilder: (context, animation, secondaryAnim, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -120,3 +120,89 @@ class PatientProfile {
 ```
 
 La entidad completa (accesibilidad, `tipo_perfil`, etc.) está en `app/lib/infrastructure/database/tables/patients_table.dart`. La conversión entre tabla y `PatientProfile` queda en el use case de la Fase 5.
+
+## Implementación — Fase 6
+Implementación completa del perfil de paciente en `782c2ea`.
+
+### Entidades y use cases (H4)
+
+| Artefacto | Descripción |
+|---|---|
+| `AccessibilityConfig` | Value object — deserializa `accessibility_config` JSON; calcula `fontSizeFactor` (`1.1`/`1.3`/`1.5`) |
+| `UpdatePatientUseCase` | Persiste nombre, `profileType`, horarios de comida/sueño y configuración de accesibilidad |
+| `PatientDao.watchActivePatient()` | Stream Drift — emite cada vez que el paciente activo cambia en SQLite |
+
+### Providers reactivos (H5)
+
+```
+activePatientProvider  (StreamProvider)  — stream del paciente activo
+patientProfileProvider (Provider)        — MedTime derivados; alimenta el motor de inferencia
+accessibilityConfigProvider (Provider)   — AccessibilityConfig actual
+isAssistedModeProvider  (Provider<bool>) — true si profileType == 'assisted'
+appThemeProvider        (Provider<ThemeData>) — ThemeData reactivo (escala fuente, alto contraste)
+```
+
+`appThemeProvider` reemplaza el `ThemeData` estático de `app.dart` — el tema se actualiza en tiempo real al guardar configuración.
+
+### Vistas (H5)
+
+| Pantalla | Descripción |
+|---|---|
+| `ProfileSettingsScreen` | Nombre, tipo de perfil (RadioGroup), 4 time pickers para reglas R02–R05, sección accesibilidad completa |
+| `AssistedModeScreen` | Solo medicamentos pendientes + completados, botones "Tomé" / "No pude" inline — sin FAB ni navegación |
+
+`app.dart` enruta a `AssistedModeScreen` cuando `isAssistedModeProvider == true`; al cambiar a 'autónomo' se vuelve a `TodayRemindersScreen` automáticamente sin restart.
+
+### Nota sobre reglas de inferencia
+
+`PrescriptionFlowNotifier` ahora recibe `patientProfileProvider` en lugar de `PatientProfile.defaults`. Las reglas R02–R05 (horarios de comida/sueño) usan los tiempos configurados por el paciente.
+
+### Code paths
+
+```
+app/lib/domain/entities/accessibility_config.dart
+app/lib/domain/use_cases/update_patient_use_case.dart
+app/lib/presentation/providers/patient_providers.dart
+app/lib/presentation/screens/settings/profile_settings_screen.dart
+app/lib/presentation/features/assisted_mode/assisted_mode_screen.dart
+```
+
+## Implementación — Fase 8
+Polish de accesibilidad y UX en `62e8577`.
+
+### reduceAnimations — soporte real
+
+`appThemeProvider` ahora incluye `PageTransitionsTheme` condicional:
+- `reduceAnimations = true` → `_InstantPageTransitionsBuilder` en Android e iOS: transiciones de página instantáneas (sin animación)
+- `MaterialApp.themeAnimationDuration = Duration.zero` cuando activo
+
+Las cuatro opciones de accesibilidad (`fontSize`, `highContrast`, `largeTargets`, `reduceAnimations`) están completamente implementadas y reactivas.
+
+### Estado de primer lanzamiento
+
+`TodayRemindersContent` observa `activePatientProvider`. Si el stream resuelve a `null` (no hay fila de paciente en SQLite — primer uso), muestra `_FirstLaunchState` con:
+- Bienvenida al sistema
+- Botón "Registrar primera receta" → navega directamente a `PrescriptionFlowScreen`
+
+Esta diferenciación evita mostrar el estado vacío genérico antes de que el usuario haya configurado algo.
+
+### Semántica de accesibilidad
+
+`Semantics(label, value)` agregado a todos los `LinearProgressIndicator` de adherencia:
+- `HistorialContent._TreatmentCard`
+- `TreatmentDetailScreen._AdherenceCard`
+
+Etiqueta: *"Adherencia al tratamiento"* — valor: *"X por ciento"*. Compatible con TalkBack / VoiceOver.
+
+### Code paths
+
+```
+app/lib/presentation/providers/patient_providers.dart  — _InstantPageTransitionsBuilder + reduceAnimationsProvider
+app/lib/presentation/app.dart                          — themeAnimationDuration reactivo
+app/lib/presentation/features/today_reminders/today_reminders_screen.dart  — _FirstLaunchState + RefreshIndicator
+app/lib/presentation/features/historial/historial_screen.dart              — RefreshIndicator + Semantics
+app/lib/presentation/features/historial/treatment_detail_screen.dart       — Semantics adherencia
+```
+
+## Corrección nota Fase 6 — routing real
+La sección 'Implementación Fase 6' menciona: "al cambiar a 'autónomo' se vuelve a `TodayRemindersScreen` automáticamente". Incorrecto desde Fase 7: `TodayRemindersScreen` fue renombrado a `TodayRemindersContent` y ya no es el `home`. El home en modo autónomo es `_MainShell` (ver `architecture.md` Fase 7 para la corrección canónica). El routing reactivo por `profileType` sigue igual — solo cambia el widget raíz.

@@ -16,10 +16,13 @@ class SnoozeReminderUseCase {
 
   /// Returns true if snooze was applied.
   /// Returns false when: medicamento crítico, o ya se alcanzó el máximo de postposiciones.
+  /// [isAlertMode] debe coincidir con el modo del recordatorio original para que la
+  /// notificación pospuesta tenga el mismo comportamiento (pantalla de alarma o discreto).
   Future<bool> execute({
     required RemindersTableData reminder,
     required bool isCritical,
     required String medicationName,
+    bool isAlertMode = true,
   }) async {
     if (isCritical) return false;
     if (reminder.snoozeCount >= _maxSnoozes) return false;
@@ -30,9 +33,12 @@ class SnoozeReminderUseCase {
     await notificationService.cancelReminder(notifId);
     await notificationService.scheduleOnce(
       id: notifId,
+      reminderId: reminder.id,
       medicationName: medicationName,
       scheduledTime: newTime,
       body: 'Recordatorio pospuesto (${reminder.snoozeCount + 1}/$_maxSnoozes).',
+      isCritical: isCritical,
+      isAlertMode: isAlertMode,
     );
 
     await reminderDao.updateStatus(
