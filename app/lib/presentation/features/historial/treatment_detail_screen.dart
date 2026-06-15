@@ -195,27 +195,31 @@ class _AdherenceCard extends StatelessWidget {
                   ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: LinearProgressIndicator(
-                    value: pct,
-                    backgroundColor: color.withValues(alpha: 0.15),
-                    color: color,
-                    minHeight: 10,
-                    borderRadius: BorderRadius.circular(5),
+            Semantics(
+              label: 'Adherencia al tratamiento',
+              value: '${(pct * 100).round()} por ciento',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      backgroundColor: color.withValues(alpha: 0.15),
+                      color: color,
+                      minHeight: 10,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '${(pct * 100).round()}%',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                    fontSize: 16,
+                  const SizedBox(width: 12),
+                  Text(
+                    '${(pct * 100).round()}%',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             Text(

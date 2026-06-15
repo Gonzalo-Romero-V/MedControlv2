@@ -13,30 +13,68 @@ class HistorialContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync = ref.watch(treatmentHistoryProvider);
 
-    return historyAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
+    if (historyAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (historyAsync.hasError) {
+      return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('Error: $e',
-              style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline,
+                  size: 48, color: Theme.of(context).colorScheme.error),
+              const SizedBox(height: 12),
+              const Text(
+                'No se pudo cargar el historial.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
+                onPressed: () => ref.invalidate(treatmentHistoryProvider),
+              ),
+            ],
+          ),
         ),
-      ),
-      data: (history) {
-        if (history.isEmpty) return const _EmptyHistorial();
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: history.length,
-          itemBuilder: (context, i) => _TreatmentCard(
-            vm: history[i],
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => TreatmentDetailScreen(vm: history[i]),
+      );
+    }
+
+    final history = historyAsync.value ?? [];
+
+    return RefreshIndicator(
+      onRefresh: () {
+        ref.invalidate(treatmentHistoryProvider);
+        return ref.read(treatmentHistoryProvider.future);
+      },
+      child: history.isEmpty
+          ? LayoutBuilder(
+              builder: (context, constraints) => ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: constraints.maxHeight,
+                    child: const _EmptyHistorial(),
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: history.length,
+              itemBuilder: (context, i) => _TreatmentCard(
+                vm: history[i],
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TreatmentDetailScreen(vm: history[i]),
+                  ),
+                ),
               ),
             ),
-          ),
-        );
-      },
     );
   }
 }
@@ -107,28 +145,32 @@ class _TreatmentCard extends StatelessWidget {
               ),
               if (vm.hasReminders) ...[
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: LinearProgressIndicator(
-                        value: pct,
-                        backgroundColor:
-                            adherenceColor.withValues(alpha: 0.15),
-                        color: adherenceColor,
-                        minHeight: 6,
-                        borderRadius: BorderRadius.circular(3),
+                Semantics(
+                  label: 'Adherencia al tratamiento',
+                  value: '${(pct * 100).round()} por ciento',
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          backgroundColor:
+                              adherenceColor.withValues(alpha: 0.15),
+                          color: adherenceColor,
+                          minHeight: 6,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      '${(pct * 100).round()}%',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: adherenceColor,
+                      const SizedBox(width: 10),
+                      Text(
+                        '${(pct * 100).round()}%',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: adherenceColor,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(

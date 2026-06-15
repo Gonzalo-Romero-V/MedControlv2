@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../providers/patient_providers.dart';
 import '../../providers/reminder_providers.dart';
+import '../../screens/prescription/prescription_flow_screen.dart';
 
 /// Body content for the "Hoy" tab.
 /// The parent _MainShell provides the Scaffold, AppBar, FAB, and NavigationBar.
@@ -11,26 +13,57 @@ class TodayRemindersContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final patientAsync = ref.watch(activePatientProvider);
     final remindersAsync = ref.watch(todayRemindersProvider);
 
-    return remindersAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => _ErrorState(message: e.toString()),
-      data: (reminders) {
-        if (reminders.isEmpty) return const _EmptyState();
-        return ListView.separated(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: reminders.length,
-          separatorBuilder: (_, i) => const Divider(height: 1, indent: 16),
-          itemBuilder: (context, i) {
-            final vm = reminders[i];
-            return _ReminderTile(
-              vm: vm,
-              onAction: () => _showActionSheet(context, ref, vm),
-            );
-          },
-        );
+    // First launch: stream resolved but no patient row in DB yet
+    if (patientAsync.hasValue && patientAsync.value == null) {
+      return const _FirstLaunchState();
+    }
+
+    if (remindersAsync.isLoading || patientAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (remindersAsync.hasError) {
+      return _ErrorState(
+        message: 'No se pudieron cargar los recordatorios.',
+        onRetry: () => ref.invalidate(todayRemindersProvider),
+      );
+    }
+
+    final reminders = remindersAsync.value ?? [];
+
+    return RefreshIndicator(
+      onRefresh: () {
+        ref.invalidate(todayRemindersProvider);
+        return ref.read(todayRemindersProvider.future);
       },
+      child: reminders.isEmpty
+          ? LayoutBuilder(
+              builder: (context, constraints) => ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: constraints.maxHeight,
+                    child: const _EmptyState(),
+                  ),
+                ],
+              ),
+            )
+          : ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: reminders.length,
+              separatorBuilder: (_, i) => const Divider(height: 1, indent: 16),
+              itemBuilder: (context, i) {
+                final vm = reminders[i];
+                return _ReminderTile(
+                  vm: vm,
+                  onAction: () => _showActionSheet(context, ref, vm),
+                );
+              },
+            ),
     );
   }
 
@@ -39,7 +72,8 @@ class TodayRemindersContent extends ConsumerWidget {
     WidgetRef ref,
     ReminderViewModel vm,
   ) async {
-    final isDone = vm.reminder.status == 'taken' || vm.reminder.status == 'closed';
+    final isDone =
+        vm.reminder.status == 'taken' || vm.reminder.status == 'closed';
     if (isDone) return;
 
     await showModalBottomSheet<void>(
@@ -48,6 +82,61 @@ class TodayRemindersContent extends ConsumerWidget {
     );
 
     ref.invalidate(todayRemindersProvider);
+  }
+}
+
+// ─── First launch ─────────────────────────────────────────────────────────────
+
+class _FirstLaunchState extends StatelessWidget {
+  const _FirstLaunchState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.medical_services_outlined,
+              size: 88,
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              '¡Bienvenido a MedControl!',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Registrá tu primera receta para comenzar a gestionar tus medicamentos.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Registrar primera receta'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const PrescriptionFlowScreen()),
+              ),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(240, 52),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -97,7 +186,8 @@ class _ReminderTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           const SizedBox(height: 2),
-          _StatusBadge(status: reminder.status, snoozeCount: reminder.snoozeCount),
+          _StatusBadge(
+              status: reminder.status, snoozeCount: reminder.snoozeCount),
         ],
       ),
       trailing: isDone
@@ -334,7 +424,7 @@ class _ReminderActionSheetState extends ConsumerState<_ReminderActionSheet> {
   }
 }
 
-// ─── Empty / Error ────────────────────────────────────────────────────────────
+// ─── Empty / Error / First launch ────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
@@ -375,7 +465,9 @@ class _EmptyState extends StatelessWidget {
 
 class _ErrorState extends StatelessWidget {
   final String message;
-  const _ErrorState({required this.message});
+  final VoidCallback? onRetry;
+
+  const _ErrorState({required this.message, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -389,18 +481,19 @@ class _ErrorState extends StatelessWidget {
                 size: 48, color: Theme.of(context).colorScheme.error),
             const SizedBox(height: 12),
             Text(
-              'Error al cargar los recordatorios',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-            const SizedBox(height: 4),
-            Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.grey),
+              style:
+                  TextStyle(color: Theme.of(context).colorScheme.error),
             ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
+                onPressed: onRetry,
+              ),
+            ],
           ],
         ),
       ),

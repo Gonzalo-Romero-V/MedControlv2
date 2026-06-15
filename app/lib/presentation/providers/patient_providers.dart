@@ -40,6 +40,10 @@ final isAssistedModeProvider = Provider<bool>((ref) {
   return patient?.profileType == 'assisted';
 });
 
+final reduceAnimationsProvider = Provider<bool>((ref) {
+  return ref.watch(accessibilityConfigProvider).reduceAnimations;
+});
+
 final appThemeProvider = Provider<ThemeData>((ref) {
   final config = ref.watch(accessibilityConfigProvider);
   const seedColor = Color(0xFF1976D2);
@@ -62,6 +66,13 @@ final appThemeProvider = Provider<ThemeData>((ref) {
         )
       : ColorScheme.fromSeed(seedColor: seedColor);
 
+  final pageTransitionsTheme = config.reduceAnimations
+      ? const PageTransitionsTheme(builders: {
+          TargetPlatform.android: _InstantPageTransitionsBuilder(),
+          TargetPlatform.iOS: _InstantPageTransitionsBuilder(),
+        })
+      : const PageTransitionsTheme();
+
   return ThemeData(
     colorScheme: colorScheme,
     useMaterial3: true,
@@ -69,5 +80,21 @@ final appThemeProvider = Provider<ThemeData>((ref) {
     materialTapTargetSize: config.largeTargets
         ? MaterialTapTargetSize.padded
         : MaterialTapTargetSize.shrinkWrap,
+    pageTransitionsTheme: pageTransitionsTheme,
   );
 });
+
+// Instant (no-animation) page transition for reduceAnimations mode.
+class _InstantPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _InstantPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) =>
+      child;
+}

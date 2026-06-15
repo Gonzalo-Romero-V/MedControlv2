@@ -18,11 +18,14 @@ class MedControlApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = ref.watch(appThemeProvider);
     final isAssisted = ref.watch(isAssistedModeProvider);
+    final reduceAnimations = ref.watch(reduceAnimationsProvider);
 
     return MaterialApp(
       title: 'MedControl',
       debugShowCheckedModeBanner: false,
       theme: theme,
+      themeAnimationDuration:
+          reduceAnimations ? Duration.zero : const Duration(milliseconds: 200),
       home: isAssisted ? const AssistedModeScreen() : const _MainShell(),
     );
   }
@@ -99,7 +102,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
           NavigationDestination(
             icon: Icon(Icons.psychology_outlined),
             selectedIcon: Icon(Icons.psychology),
-            label: 'BC',
+            label: 'Conocimiento',
           ),
         ],
       ),
