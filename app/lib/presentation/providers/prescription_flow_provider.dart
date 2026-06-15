@@ -13,6 +13,7 @@ import '../../domain/use_cases/parse_prescription_use_case.dart';
 import '../../domain/use_cases/schedule_reminders_use_case.dart';
 import 'ai_providers.dart';
 import 'database_providers.dart';
+import 'patient_providers.dart';
 import 'reminder_providers.dart';
 
 // ─── Estados del flujo ────────────────────────────────────────────────────────
@@ -70,12 +71,14 @@ class PrescriptionFlowNotifier extends StateNotifier<PrescriptionFlowState> {
   final ParsePrescriptionUseCase parseUseCase;
   final ConfirmPrescriptionUseCase confirmUseCase;
   final ScheduleRemindersUseCase scheduleRemindersUseCase;
+  final PatientProfile patientProfile;
   final InferenceEngine _engine;
 
   PrescriptionFlowNotifier({
     required this.parseUseCase,
     required this.confirmUseCase,
     required this.scheduleRemindersUseCase,
+    required this.patientProfile,
   })  : _engine = const InferenceEngine(),
         super(const PrescriptionFlowIdle());
 
@@ -124,10 +127,7 @@ class PrescriptionFlowNotifier extends StateNotifier<PrescriptionFlowState> {
   /// y transiciona a la revisión de horarios.
   void submitReviewedPrescription(ParsedPrescription corrected) {
     final facts = corrected.toTreatmentFacts(startDate: DateTime.now());
-    final inferenceResult = _engine.inferSchedule(
-      facts,
-      PatientProfile.defaults,
-    );
+    final inferenceResult = _engine.inferSchedule(facts, patientProfile);
     state = PrescriptionFlowReviewSchedule(
       prescription: corrected,
       inferenceResult: inferenceResult,
@@ -201,5 +201,6 @@ final prescriptionFlowProvider =
     parseUseCase: ref.watch(parsePrescriptionUseCaseProvider),
     confirmUseCase: ref.watch(confirmPrescriptionUseCaseProvider),
     scheduleRemindersUseCase: ref.watch(scheduleRemindersUseCaseProvider),
+    patientProfile: ref.watch(patientProfileProvider),
   );
 });

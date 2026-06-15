@@ -16,6 +16,10 @@ class PatientDao extends DatabaseAccessor<AppDatabase> with _$PatientDaoMixin {
       (select(patientsTable)..where((t) => t.isActive.equals(true)))
           .getSingleOrNull();
 
+  Stream<PatientsTableData?> watchActivePatient() =>
+      (select(patientsTable)..where((t) => t.isActive.equals(true)))
+          .watchSingleOrNull();
+
   Future<PatientsTableData?> getById(String id) =>
       (select(patientsTable)..where((t) => t.id.equals(id)))
           .getSingleOrNull();

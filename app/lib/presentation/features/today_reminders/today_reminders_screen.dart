@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../providers/reminder_providers.dart';
+import '../../screens/prescription/prescription_flow_screen.dart';
+import '../../screens/settings/profile_settings_screen.dart';
 
 class TodayRemindersScreen extends ConsumerWidget {
   const TodayRemindersScreen({super.key});
@@ -23,7 +25,23 @@ class TodayRemindersScreen extends ConsumerWidget {
             tooltip: 'Actualizar',
             onPressed: () => ref.invalidate(todayRemindersProvider),
           ),
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Perfil',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => const ProfileSettingsScreen()),
+            ),
+          ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+              builder: (_) => const PrescriptionFlowScreen()),
+        ),
+        icon: const Icon(Icons.add),
+        label: const Text('Registrar receta'),
       ),
       body: remindersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
